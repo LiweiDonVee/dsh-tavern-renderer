@@ -1,0 +1,92 @@
+# DSH Tavern Renderer 全功能演示
+
+> 把本文件全部内容作为一条「用户消息」粘贴发送（建议开一个新会话）。
+> 发送后可以再发一条：{{getvar::mood}} / {{getvar::score}} / {{incvar::turn}}，观察变量在同一会话内持久。
+
+## 01 身份宏（默认 Assistant / User，可用控制台 configure 注入真实名称）
+
+我是 {{user}}，{{char}} 是我这边的主持人，当前角色是 {{role}}。
+persona/description/scenario 在聊天里默认为空：{{persona}}｜{{description}}｜{{scenario}}
+未知宏保持原样：{{unknown_macro_xyz}}
+
+## 02 时间宏
+
+{{date}}（{{weekday}}），本地 {{time}}；UTC {{isotime}} / {{isodate}}
+多行效果：第一行{{newline}}第二行
+
+## 03 变量（setvar/addvar 无输出，incvar 输出新值）
+
+{{setvar::mood::calm}}{{setvar::score::10}}{{addvar::score::2}}
+mood = {{getvar::mood}}，score = {{getvar::score}}，递增一次 = {{incvar::score}}，再读 = {{getvar::score}}
+
+## 04 安全内联表达式 {{js::...}}
+
+- {{js::1 + 2 * 3}}、{{js::(6 * 7) + 1}}、{{js::10 >= 5 ? "大" : "小"}}、{{js::user + " 说 " + char}}
+- 变量参与：score = {{getvar::score}}，double = {{js::score * 2}}
+- 越界被拒（无 eval，纯白名单解析器）：{{js::window.location}} 与 {{js:: 1 + }} 都会变成 [expression error]
+
+## 05 行内格式
+
+**粗体**、*斜体*、***粗斜体***、~~删除线~~、++下划线++、`行内代码`、\*转义星号\*、\_转义下划线\_
+
+## 06 标题层级
+
+# H1
+## H2
+### H3
+#### H4
+##### H5
+###### H6
+
+## 07 引用与分隔线
+
+> 第一层引用
+> > 嵌套引用
+> 引用里的 **格式** 和 {{time}}
+
+---
+
+## 08 列表（支持嵌套）
+
+- 无序 A
+- 无序 B
+  - 嵌套 B1
+  - 嵌套 B2
+- 无序 C
+
+1. 有序一
+2. 有序二
+   1. 嵌套 1
+   2. 嵌套 2
+3. 有序三
+
+## 09 表格（对齐冒号会被忽略，单元格支持行内格式）
+
+| 名称 | 类型 | 数值 |
+| --- | :--- | ---: |
+| HP | 生命 | 100 |
+| MP | **魔力** | 42 |
+
+## 10 代码围栏（语言类名保留，由 CSS 白名单放行）
+
+```js
+const answer = 6 * 7
+console.log(answer)
+```
+
+注意：宏在 Markdown 之前求值，所以围栏里写 {{js:: 6 * 7 }} 显示出来也是 42。
+
+## 11 链接与图片（自动 _blank + noopener noreferrer）
+
+[普通链接](https://example.com)
+![HTTP 状态猫](https://http.cat/200 "200 OK")
+
+## 12 原始 HTML（DOM 白名单清洗 + 类名改写 + 内联 CSS 作用域化）
+
+<kbd>Ctrl</kbd> + <kbd>C</kbd>，上标 x<sup>2</sup>，下标 H<sub>2</sub>O
+<details><summary>点击展开</summary>这里是 details 折叠内容</details>
+<span class="demo-status">ready</span>
+<style>.demo-status { color:#167565; font-weight:600 }</style>
+
+<script>alert('这一整段会被删除')</script>
+（上面这行 script 你看不到，就是被清洗掉了；iframe/form/onclick 等同样处理）

@@ -1,0 +1,11 @@
+node_modules/
+.host/
+lib/
+*.log
+.env
+.env.*
+!.env.example
+*.tgz
+coverage/
+test-results/
+.playwright/

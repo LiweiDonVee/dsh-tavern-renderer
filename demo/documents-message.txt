@@ -1,0 +1,109 @@
+Eight immersive document templates
+
+:::letter
+from: Luna Vale
+to: Alex Rowan
+date: August 15, 2026
+place: North Observatory
+subject: The signal after midnight
+seal: crimson
+---
+Dear **Alex**,
+
+The receiver woke at 23:40. I heard our old call sign beneath the static.
+:::
+
+:::exam
+title: Astral Navigation Examination
+course: NAV-204
+student: Alex Rowan
+date: August 15, 2026
+duration: 90 minutes
+total: 100
+instructions: Show each calculation. Unsupported answers receive no credit.
+---
+1. Plot a transfer from Selene Harbor to Meridian Station. **[25 marks]**
+2. Explain the red shift recorded at 23:40. **[25 marks]**
+3. Decode the supplied beacon sequence. **[50 marks]**
+:::
+
+:::postcard
+from: Luna
+to: Alex
+location: Selene Harbor
+date: April 12, 2086
+stamp: airmail
+---
+Wish you were **here**. The harbor lights look like a second constellation.
+:::
+
+:::cipher
+classification: eyes only
+code: NIGHTJAR-7
+from: L
+to: A
+date: 2086-04-12
+key: ORBIT
+status: authenticated
+---
+`RENDEZVOUS = 23:10`
+
+Use the west stair. Trust no message bearing the old seal.
+:::
+
+:::telegram
+priority: urgent
+from: LUNA VALE
+to: ALEX ROWAN
+station: NORTH TERMINAL
+date: AUG 15
+time: 2348
+operator: M-7
+charge: 17 words
+---
+ARRIVE BEFORE **MIDNIGHT** STOP BRING STAR CHART STOP DO NOT ANSWER RETURN SIGNAL STOP
+:::
+
+:::newspaper
+name: The Meridian Gazette
+date: August 16, 2026
+edition: Late City
+section: Night edition
+headline: LIGHTS ARC OVER THE HARBOR
+deck: Witnesses report a silent formation above the northern breakwater
+byline: Mira Vale
+---
+At 23:40, every receiver in the old quarter tuned itself to the same empty frequency.
+
+Officials described the event as an atmospheric disturbance. Dockworkers were less certain.
+:::
+
+:::dossier
+agency: Archive Bureau
+file: AX-194
+subject: Alex Rowan
+classification: restricted
+status: active
+date: August 15, 2026
+handler: L. Chen
+---
+- Known alias: **Northstar**
+- Last sighting: West Tower
+- Associated signal: `NIGHTJAR-7`
+
+Assessment: cooperative, observant, and likely under surveillance.
+:::
+
+:::diary
+owner: Luna Vale
+date: August 15
+time: 23:40
+location: West Tower
+mood: restless
+weather: clear, no wind
+title: The signal
+---
+Tonight the receiver spoke *my name*.
+
+I checked the tape three times. On the fourth pass, it spoke yours.
+:::
