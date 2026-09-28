@@ -7,8 +7,20 @@ import { build } from 'esbuild'
 import { JSDOM } from 'jsdom'
 
 const rendererDir = fileURLToPath(new URL('..', import.meta.url))
-const hostModules = resolve(process.env.DSH_HOST_NODE_MODULES ?? join(rendererDir, '../../audit/dsh-upgrade-20260928/candidate/node_modules'))
+const explicitHostModules = process.env.DSH_HOST_NODE_MODULES
+const defaultHostModules = resolve(join(rendererDir, '../../../audit/dsh-upgrade-20260928/candidate/node_modules'))
+const hostModules = explicitHostModules ? resolve(explicitHostModules) : existsSync(defaultHostModules) ? defaultHostModules : undefined
 const rpDir = process.env.DSH_RP_UI_DIR ? resolve(process.env.DSH_RP_UI_DIR) : undefined
+if (explicitHostModules !== undefined && !existsSync(hostModules)) {
+  throw new Error('DSH_HOST_NODE_MODULES does not exist: ' + hostModules)
+}
+if (process.env.DSH_RP_UI_DIR !== undefined && !existsSync(rpDir)) {
+  throw new Error('DSH_RP_UI_DIR does not exist: ' + rpDir)
+}
+const hostSkip = hostModules === undefined ? 'SKIP: candidate host not found; set DSH_HOST_NODE_MODULES (default checked: ' + defaultHostModules + ')' : false
+const rpSkip = rpDir === undefined ? 'SKIP: DSH_RP_UI_DIR is not set; RP dock contract is private-fixture-only' : false
+if (hostSkip) console.warn('[host-contract] ' + hostSkip)
+if (rpSkip) console.warn('[host-contract] ' + rpSkip)
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
 const hostPath = (name, path) => join(hostModules, '@deepseek-ai', name, path)
 
@@ -70,7 +82,7 @@ async function host() {
   return { dom, seeds, loader, entries, errors }
 }
 
-test('rc.2 Web loads renderer through the shipped injection graph and primitives', async t => {
+test('rc.2 Web loads renderer through the shipped injection graph and primitives', { skip: hostSkip }, async t => {
   const h = await host()
   t.after(() => h.dom.window.close())
   const visit = (id, seen = new Set()) => {
@@ -96,7 +108,7 @@ test('rc.2 Web loads renderer through the shipped injection graph and primitives
   assert.deepEqual(h.errors, [])
 })
 
-test('rc.2 keyed chat slot supplies distinct Session identities and restores host renderers', async t => {
+test('rc.2 keyed chat slot supplies distinct Session identities and restores host renderers', { skip: hostSkip }, async t => {
   const h = await host()
   const { Context } = h.seeds['@deepseek-ai/cordis']
   const ctx = new Context()
@@ -157,7 +169,7 @@ async function waitForSlotEntry(slots, name) {
   })
 }
 
-test('rc.2 real SlotRegistry and UiSession preserve the active RP dock contract', { skip: rpDir === undefined }, async t => {
+test('rc.2 real SlotRegistry and UiSession preserve the active RP dock contract', { skip: hostSkip || rpSkip }, async t => {
   const h = await host()
   const { Context } = h.seeds['@deepseek-ai/cordis']
   const ctx = new Context()
