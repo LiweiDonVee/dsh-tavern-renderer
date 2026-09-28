@@ -1,23 +1,19 @@
 # DeepSeek Harness Tavern Renderer
 
-An independent DSH message renderer with ordered regex/macros, a constrained expression evaluator, sanitized Markdown/HTML/CSS, and eight original document templates. Tested with DSH 0.1.2-rc.1. Requires Node.js 24 for development; no arbitrary JavaScript execution. MIT licensed. The installation commands below also work in a POSIX shell. Keep the checkout in place when installed as a local link.
-
 面向 DeepSeek Harness 的自包含“酒馆式”消息渲染插件。它以 Harness 原生 Cordis keyed slot 接入，不改 Harness 源码，并提供有序正则、宏/变量、安全表达式、Markdown、HTML/CSS 清洗、角色模板、主题系统，以及八种可复用的沉浸式文档模板。
 
 规格依据见 [SPEC.md](./SPEC.md)，架构与安全决策见 [DESIGN.md](./DESIGN.md)，外部参考与许可证见 [SOURCES.md](./SOURCES.md)。
 
 ## 安装和启用
 
-当前适配目标为 DeepSeek Harness `0.1.2-rc.1`，Node.js 24+。首次从源码安装需要构建；不包含用户配置或会话数据。它是独立社区插件，与 DeepSeek AI 无隶属关系。
+当前适配目标为 DeepSeek Harness `0.1.7-rc.2`，Node.js 22+。仓库已包含构建后的 `lib/client.js`，本地安装不运行安装脚本。
 
 ```powershell
-git clone https://github.com/LiweiDonVee/dsh-tavern-renderer.git
 cd dsh-tavern-renderer
 npm ci
-npm install --prefix .host --no-audit --no-fund @deepseek-ai/dsh@0.1.2-rc.1
 npm run check
-npx --yes @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add .
-npx --yes @deepseek-ai/dsh@0.1.2-rc.1 web
+npx --yes @deepseek-ai/dsh@0.1.7-rc.2 plugin --profile web add .
+npx --yes @deepseek-ai/dsh@0.1.7-rc.2 --profile web
 ```
 
 启动后使用终端打印的完整 Web URL（含一次性 token）进入；不要把 token 固化进配置、分享链接或测试产物。认证由宿主处理，插件无需自行管理 token。
@@ -25,7 +21,7 @@ npx --yes @deepseek-ai/dsh@0.1.2-rc.1 web
 bundle 会向 Web profile 插入 `tavern-renderer` 行。客户端随后以 `priority: -100` 覆盖 `assistant-step`、`user` 和 `steering` 三个消息 renderer。消息 slot 由 `@deepseek-ai/dsh-client-ui-chat` 声明，语言域为 `chat`；图片使用宿主传入的 `renderMessageImages`，保留宿主授权加载。删除插件后原 renderer 自动恢复：
 
 ```powershell
-npx --yes @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web remove dsh-tavern-renderer
+npx --yes @deepseek-ai/dsh@0.1.7-rc.2 plugin --profile web remove dsh-tavern-renderer
 ```
 
 ## 固定渲染顺序
@@ -234,12 +230,12 @@ npm pack --dry-run
 | `registerStage()` / `setStageEnabled()` | 扩展或切换管线阶段 |
 | `setTheme()` / `setCustomCss()` | 切换主题和注入安全作用域 CSS |
 
-公开版本的浏览器 API version 为 `0.2.1`；每条渲染内容带 `data-render-trace` 诊断属性。`npm run check` 包含 38 项单测和 2 项真实宿主 loader/slot 契约测试。宿主位于 `.host/node_modules`，也可通过 `DSH_HOST_NODE_MODULES` 指定。
+页面根节点的 `data-dsh-tavern-renderer-version="0.2.1"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
 
-## DSH 兼容边界（2026-09-07）
+## DSH 兼容边界（2026-09-28）
 
-- Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat`。
+- Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat`。已按实际 `0.1.7-rc.2` Web manifest 验证完整注入闭包。
 - 此插件没有 `ApiProxy`、后端 Remote 服务或自定义 settings card；主题/宏配置仍由浏览器 API 和 localStorage 管理，无 settings card 迁移项。
-- 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 Session 日志，也不参与 RP settlement。流式 `running` 与最终 `settled` / `interrupted` 语义保持。
-- Session v2、持久化 assistant settlement 和异步 `agentLoop.create()` 属于 `0.1.3-alpha.1`，未纳入本次验证；peer 范围限制在 0.1.2 系列，升级需重新检查展示契约。
+- 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 V4 Session 日志，也不参与 RP settlement。流式 `running` 与最终 `settled` / `interrupted` 语义保持。
+- `snapshotEvents`、`eventAt` 和 `ownEvents` 已从渲染器边界排除；agent 生命周期、Profile plugin settings、Remote 双向流和 preset plugin bundles 由宿主负责。渲染器按 Session ID 取得会话作用域，因此多个 Session 可同时拥有独立变量与 renderer 实例。
 - `npm run check` 覆盖核心渲染、slot 优先级/语言域和宿主图片入口；不等同于已做真实浏览器端登录和 UI 验收。

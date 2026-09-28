@@ -20,11 +20,19 @@ function variableScope(context) {
 export class RenderPipeline {
   constructor(stages) {
     this.stages = [...stages]
+    for (const stage of this.stages) {
+      if (stage.securityCritical === true && stage.enabled === false) {
+        throw new TypeError(`cannot disable security-critical stage: ${stage.name}`)
+      }
+    }
   }
 
   register(stage) {
     if (stage === null || typeof stage !== 'object' || typeof stage.name !== 'string' || typeof stage.run !== 'function') {
       throw new TypeError('stage requires name and run')
+    }
+    if (stage.securityCritical === true && stage.enabled === false) {
+      throw new TypeError(`cannot disable security-critical stage: ${stage.name}`)
     }
     if (this.stages.some(item => item.name === stage.name)) throw new Error(`stage already registered: ${stage.name}`)
     let index = this.stages.length
@@ -46,6 +54,9 @@ export class RenderPipeline {
   setEnabled(name, enabled) {
     const stage = this.stages.find(item => item.name === name)
     if (stage === undefined) throw new Error(`unknown stage: ${name}`)
+    if (stage.securityCritical === true && !Boolean(enabled)) {
+      throw new TypeError(`cannot disable security-critical stage: ${name}`)
+    }
     stage.enabled = Boolean(enabled)
   }
 
@@ -58,7 +69,28 @@ export class RenderPipeline {
         value = String(stage.run(value, state) ?? '')
         trace.push({ name: stage.name })
       } catch (error) {
-        trace.push({ name: stage.name, error: error instanceof Error ? error.message : String(error) })
+        const message = error instanceof Error ? error.message : String(error)
+        const securityCritical = stage.securityCritical === true
+        const traceEntry = { name: stage.name, error: message }
+        if (securityCritical) traceEntry.securityCritical = true
+        trace.push(traceEntry)
+        if (Array.isArray(state?.diagnostics)) {
+          const diagnostic = { stage: stage.name, error: message }
+          if (securityCritical) diagnostic.securityCritical = true
+          state.diagnostics.push(diagnostic)
+        }
+        if (securityCritical) {
+          return {
+            html: '',
+            trace,
+            error: {
+              code: 'RENDER_STAGE_FAILED',
+              stage: stage.name,
+              message,
+              securityCritical: true,
+            },
+          }
+        }
       }
     }
     return { html: value, trace }
@@ -102,9 +134,10 @@ export class TavernRenderer {
         },
       },
       { name: 'markdown', run: (value, state) => restoreDocumentBlocks(markdownToHtml(value), state.documents) },
-      { name: 'sanitize', run: value => sanitizeHtml(value) },
+      { name: 'sanitize', securityCritical: true, run: value => sanitizeHtml(value) },
       {
         name: 'template',
+        securityCritical: true,
         run: (value, state) => sanitizeHtml(
           applyRoleTemplate(value, state.context.role, state.context, this.options.templates),
           { preservePluginClasses: true },

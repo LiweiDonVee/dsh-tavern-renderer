@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import {
-  IconCheckOutline16, IconCopyOutline16, IconThinkOutline14, JsonBlock, Tooltip, writeClipboard,
+  IconCheckOutlineRegular, IconCopyOutlineRegular, IconThinkOutlineRegular, JsonBlock, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 function SafeHtml({ result, className }) {
   return (
@@ -30,7 +30,7 @@ function CopyAction({ text, t }) {
   return (
     <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
       <button type="button" className="dsh-tr-copy" aria-label={copied ? t('copied') : t('copy')} onClick={copy}>
-        {copied ? <IconCheckOutline16 size={16} /> : <IconCopyOutline16 size={16} />}
+        {copied ? <IconCheckOutlineRegular size={16} /> : <IconCopyOutlineRegular size={16} />}
       </button>
     </Tooltip>
   )
@@ -45,7 +45,7 @@ function ReasoningBlock({ text, running, renderTavern }) {
   return (
     <details className="dsh-tr-reasoning" data-running={running || undefined}>
       <summary>
-        <IconThinkOutline14 size={14} />
+        <IconThinkOutlineRegular size={14} />
         <span>Think</span>
         <span className="dsh-tr-reasoning-summary">{summary}</span>
       </summary>

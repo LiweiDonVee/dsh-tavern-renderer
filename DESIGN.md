@@ -68,7 +68,7 @@ The bundle's `cordis.patch.yml` inserts one Loader row naming this package. Its 
 dsh plugin --profile web add .
 ```
 
-The adapter preserves image groups through the host-owned `renderMessageImages` slot callback and unknown JSON blocks through existing platform primitives. It uses the `chat` locale namespace and explicitly injects `@deepseek-ai/dsh-client-ui-chat`; attachment components are not imported as package values in 0.1.2-rc.1. Assistant tool-call heads remain omitted because Harness's chat grouping renders tool rows separately. Reasoning remains a disclosure. User/steering text gains the same pipeline and retains image/unknown-block visibility plus copy action.
+The adapter preserves image groups through the host-owned `renderMessageImages` slot callback and unknown JSON blocks through existing platform primitives. It uses the `chat` locale namespace and explicitly injects `@deepseek-ai/dsh-client-ui-chat`; the rc.2 host owns attachment loading and the session-scoped keyed slot. Assistant tool-call heads remain omitted because Harness's chat grouping renders tool rows separately. Reasoning remains a disclosure. User/steering text gains the same pipeline and retains image/unknown-block visibility plus copy action.
 
 Assistant nodes receive Harness's `status === 'running'` as render context. Harness already replaces the partial node on every stream frame, so React's existing memo boundaries remain valid. The plugin uses the flag only to render an unfinished known document as a live draft; no timers, observers, or Harness core patches are introduced.
 
@@ -131,4 +131,4 @@ Theme name, serializable renderer configuration, and safe custom CSS persist in 
 
 ## 8. Host version boundary
 
-The current adapter targets npm DSH 0.1.2-rc.1. Web launch-token authentication stays in the host. Renderer preferences remain browser-local; no settings card or ApiProxy endpoint needs migration. Session v2 / durable attempt settlements arrive in 0.1.3-alpha.1 and require a separate compatibility pass. The renderer never treats display nodes as the RP settlement or canonical state surface.
+The current adapter targets npm DSH 0.1.7-rc.2. Web launch-token authentication, V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote binary/bidirectional transport stay in the host. Renderer preferences remain browser-local; no settings card or ApiProxy endpoint needs migration. The renderer never treats display nodes as the RP settlement or canonical state surface, and it does not call deprecated `snapshotEvents`, `eventAt`, or `ownEvents` APIs.

@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { build } from 'esbuild'
 import { runInNewContext } from 'node:vm'
 
-it('uses the rc.1 host image slot for assistant, user and steering images', async () => {
+it('uses the rc.2 host image slot for assistant, user and steering images', async () => {
   const result = await build({
     entryPoints: ['src/client/renderers.jsx'], bundle: true, write: false,
     format: 'cjs', jsx: 'automatic', packages: 'external',
