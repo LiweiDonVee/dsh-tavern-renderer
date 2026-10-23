@@ -1,4 +1,4 @@
-# Add the dual-face client package to the active Harness Web composition.
+# Add the dual-face client package to the active Harness Web or Desktop composition.
 - insert:
     - id: tavern-renderer
       name: dsh-tavern-renderer

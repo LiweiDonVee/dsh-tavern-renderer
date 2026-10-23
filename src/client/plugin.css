@@ -1,6 +1,7 @@
 [data-dsh-tavern-renderer] {
   color: var(--dtr-text);
-  font-size: 16px;
+  font-family: var(--dsw-font-family, system-ui, sans-serif);
+  font-size: var(--dsh-content-font-size, 16px);
   line-height: 1.75;
 }
 
@@ -48,7 +49,7 @@
   border-radius: 4px;
   background: var(--dtr-code);
   padding: 0.08em 0.32em;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Consolas, monospace);
   font-size: 0.88em;
 }
 .dsh-tr-message-content pre {
@@ -480,7 +481,13 @@
 .dsh-tr-message-content .custom-dtr-diary-flourish span { width: 7px; height: 7px; border: 1px solid #866c5d; transform: rotate(45deg); }
 
 .dsh-tr-user-root { align-items: flex-end; }
-.dsh-tr-user-stack { display: flex; max-width: min(82%, 760px); flex-direction: column; align-items: flex-end; gap: 8px; }
+.dsh-tr-user-stack { display: flex; min-width: 0; max-width: min(82%, 760px); flex-direction: column; align-items: flex-end; gap: 8px; }
+.dsh-tr-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 100%; }
+.dsh-tr-attachments > div { min-width: 0; max-width: 100%; }
+.dsh-tr-file { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; padding: 8px 12px; border: 1px solid var(--dtr-border); border-radius: 7px; background: var(--dtr-surface-raised); }
+.dsh-tr-file > span { min-width: 0; overflow-wrap: anywhere; }
+.dsh-tr-file small { display: block; color: var(--dtr-muted); font-size: 0.8em; }
+.dsh-tr-references { max-width: 100%; overflow-wrap: anywhere; color: var(--dtr-muted); font-size: 0.85em; }
 .dsh-tr-user-bubble {
   max-width: 100%;
   border: 1px solid var(--dtr-border);
@@ -502,7 +509,7 @@
 }
 .dsh-tr-copy:hover { background: var(--dtr-surface-raised); color: var(--dtr-text); }
 
-.dsh-tr-reasoning { color: var(--dtr-muted); font-size: 14px; }
+.dsh-tr-reasoning { color: var(--dtr-muted); font-size: var(--dsh-content-font-size-secondary, 14px); }
 .dsh-tr-reasoning summary { display: flex; min-height: 28px; align-items: center; gap: 7px; cursor: pointer; list-style: none; }
 .dsh-tr-reasoning summary::-webkit-details-marker { display: none; }
 .dsh-tr-reasoning-summary { min-width: 0; overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }

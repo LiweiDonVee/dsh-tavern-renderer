@@ -6,6 +6,7 @@ This file records source material consulted for the renderer and the immersive-d
 |---|---|---|---|
 | SillyTavern source snapshot | https://github.com/SillyTavern/SillyTavern/tree/8172dcd0ee672d3cd9a5e5f7af134f91a45cd2b8 | GNU AGPL-3.0 | Behavioral research for regex, macro, Markdown, sanitization, CSS scoping, and theme semantics documented in `SPEC.md`. No SillyTavern source code or assets are copied into this package. |
 | DeepSeek Harness source snapshot | https://github.com/deepseek-ai/DeepSeek-Harness/tree/47f943859bef60e4160492346772ded9b24f765a | MIT | Native Cordis slot contract, message-node shape, and partial-frame behavior used for integration. No Harness source file is modified or redistributed by this package. |
+| DeepSeek Harness 0.2.1 adapter update (checked 2026-10-23) | https://github.com/deepseek-ai/deepseek-harness/tree/687f282e8625c6b8d11ff58211a90524be2e4317 | MIT | Public image Factory, grouped message props, host typography variables, and Desktop profile CLI documentation. Verified with the shipped npm `@deepseek-ai/dsh` 0.2.1-rc.2 and 0.2.1-rc.3 packages. |
 | Paper CSS | https://github.com/cognitom/paper-css | MIT | Consulted as a reference for treating paper as a bounded printable surface. No CSS declarations, assets, or page-size classes were copied. |
 | Tufte CSS | https://github.com/edwardtufte/tufte-css | MIT | Consulted for general serif hierarchy and long-form reading conventions. No CSS declarations, fonts, or assets were copied. |
 

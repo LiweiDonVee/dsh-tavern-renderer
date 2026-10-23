@@ -9,7 +9,7 @@ The reverse-engineered source snapshots are fixed so later upstream changes cann
 - SillyTavern `SillyTavern/SillyTavern` commit `8172dcd0ee672d3cd9a5e5f7af134f91a45cd2b8` (working tree reports version 1.18.0).
 - DeepSeek Harness `deepseek-ai/DeepSeek-Harness` commit `47f943859bef60e4160492346772ded9b24f765a`.
 
-Paths and line numbers below refer to those commits. The current Harness adapter was separately reviewed against the shipped npm `0.1.7-rc.2` host on 2026-09-28: `ui-chat` owns the session-scoped keyed node slot and `chat` locale, and images use the owner-provided `renderMessageImages`. V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote transport remain host concerns.
+Paths and line numbers below refer to those commits. The current Harness adapter was separately verified against shipped npm `0.2.1-rc.2` and `0.2.1-rc.3` hosts on 2026-10-23: `ui-chat` owns the session-scoped keyed node slot and `chat` locale. Images use the public `conversation.images.content` Factory with the owner-provided authorized `loadImage`. Web and Desktop share this client contract. V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote transport remain host concerns.
 
 ## 2. SillyTavern display pipeline
 

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 import { build } from 'esbuild'
 import { JSDOM } from 'jsdom'
 
 const rendererDir = fileURLToPath(new URL('..', import.meta.url))
 const explicitHostModules = process.env.DSH_HOST_NODE_MODULES
-const defaultHostModules = resolve(join(rendererDir, '../../../audit/dsh-upgrade-20260928/candidate/node_modules'))
+const defaultHostModules = resolve(join(rendererDir, '.host/node_modules'))
 const hostModules = explicitHostModules ? resolve(explicitHostModules) : existsSync(defaultHostModules) ? defaultHostModules : undefined
 const rpDir = process.env.DSH_RP_UI_DIR ? resolve(process.env.DSH_RP_UI_DIR) : undefined
 if (explicitHostModules !== undefined && !existsSync(hostModules)) {
@@ -24,15 +24,22 @@ if (rpSkip) console.warn('[host-contract] ' + rpSkip)
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
 const hostPath = (name, path) => join(hostModules, '@deepseek-ai', name, path)
 
-async function host() {
+test('current DSH accepts the renderer without a version exemption', { skip: hostSkip }, async () => {
+  const { evaluatePluginCompatibility } = await import(pathToFileURL(hostPath('dsh-app-boot', 'lib/index.js')).href)
+  const pkg = json(join(rendererDir, 'package.json'))
+  const version = json(hostPath('dsh', 'package.json')).version
+  assert.equal(evaluatePluginCompatibility(pkg, {}, version), undefined)
+})
+
+async function host({ desktop = false } = {}) {
   const frontend = hostPath('dsh-web-frontend', 'dist')
-  assert.equal(json(hostPath('dsh-web-frontend', 'package.json')).version, '0.1.7-rc.2')
+  assert.match(json(hostPath('dsh-web-frontend', 'package.json')).version, /^0\.2\.1-rc\.[23]$/)
   const html = readFileSync(join(frontend, 'index.html'), 'utf8')
   const entry = resolve(frontend, html.match(/<script type="module"[^>]*src="([^"]+)"/)[1])
   const source = readFileSync(entry, 'utf8')
   const seedFunction = source.match(/staticModules:(\w+)\(\)/)?.[1]
   assert.ok(seedFunction, 'candidate Web must expose its static module factory')
-  const start = source.lastIndexOf('const uo=globalThis.dshDesktopBoot')
+  const start = source.search(/const \w+=globalThis\.dshDesktopBoot/)
   assert.ok(start > 0, 'candidate Web launch seam changed')
   const compiled = await build({
     stdin: { contents: source.slice(0, start) + `;window.__hostSeeds = ${seedFunction}();`, resolveDir: dirname(entry) },
@@ -41,6 +48,14 @@ async function host() {
   const dom = new JSDOM('<!doctype html><html><head></head><body><div id="test-root"></div></body></html>', {
     url: 'http://localhost/', runScripts: 'outside-only', pretendToBeVisual: true,
   })
+  if (desktop) {
+    // Electron registers dsh-app as a standard secure scheme with localStorage.
+    // JSDOM needs that storage supplied explicitly for custom schemes.
+    const storage = dom.window.localStorage
+    Object.defineProperty(dom.window, 'localStorage', { value: storage })
+    dom.reconfigure({ url: 'dsh-app://app/' })
+    dom.window.dshDesktop = {}
+  }
   const errors = []
   dom.window.addEventListener('error', event => errors.push(event.error ?? event.message))
   dom.window.eval(compiled.outputFiles[0].text)
@@ -82,7 +97,7 @@ async function host() {
   return { dom, seeds, loader, entries, errors }
 }
 
-test('rc.2 Web loads renderer through the shipped injection graph and primitives', { skip: hostSkip }, async t => {
+test('Web loads renderer through the shipped injection graph and primitives', { skip: hostSkip }, async t => {
   const h = await host()
   t.after(() => h.dom.window.close())
   const visit = (id, seen = new Set()) => {
@@ -95,20 +110,20 @@ test('rc.2 Web loads renderer through the shipped injection graph and primitives
     return seen
   }
   const closure = visit('dsh-tavern-renderer')
-  for (const name of ['dsh-client-ui-chat', 'dsh-client-ui-conversation', 'dsh-client-ui-session', 'dsh-client-ui-renderer', 'dsh-client-locale']) {
+  for (const name of ['dsh-client-ui-attachment', 'dsh-client-ui-chat', 'dsh-client-ui-conversation', 'dsh-client-ui-session', 'dsh-client-ui-renderer', 'dsh-client-locale']) {
     assert.ok(closure.has(`@deepseek-ai/${name}`), `renderer lost provider ${name}`)
   }
   const plugin = await h.loader.import('dsh-tavern-renderer')
   assert.deepEqual(Array.from(plugin.inject), ['slots'])
   const primitives = h.seeds['@deepseek-ai/dsh-client-ui-primitives']
-  for (const name of ['IconCheckOutlineRegular', 'IconCopyOutlineRegular', 'IconThinkOutlineRegular', 'JsonBlock', 'Tooltip', 'writeClipboard']) {
+  for (const name of ['FileTypeIcon', 'fileSizeText', 'IconCheckOutlineRegular', 'IconCopyOutlineRegular', 'IconThinkOutlineRegular', 'JsonBlock', 'Tooltip', 'writeClipboard']) {
     assert.equal(typeof primitives[name], 'function', `missing candidate primitive: ${name}`)
   }
   assert.equal(typeof plugin.apply, 'function')
   assert.deepEqual(h.errors, [])
 })
 
-test('rc.2 keyed chat slot supplies distinct Session identities and restores host renderers', { skip: hostSkip }, async t => {
+test('keyed chat slot supplies distinct Session identities and restores host renderers', { skip: hostSkip }, async t => {
   const h = await host()
   const { Context } = h.seeds['@deepseek-ai/cordis']
   const ctx = new Context()
@@ -153,6 +168,99 @@ function observable(initial) {
     set: next => { value = next; for (const listener of listeners) listener() },
     listeners,
   }
+}
+
+async function waitForImage(dom, container) {
+  const selector = 'img[src="https://example.test/image.png"]'
+  if (container.querySelector(selector)) return
+  await new Promise((resolve, reject) => {
+    const observer = new dom.window.MutationObserver(() => {
+      if (!container.querySelector(selector)) return
+      observer.disconnect()
+      clearTimeout(timer)
+      resolve()
+    })
+    const timer = setTimeout(() => {
+      observer.disconnect()
+      reject(new Error('Image did not finish loading: ' + container.innerHTML))
+    }, 2000)
+    observer.observe(container, { subtree: true, childList: true, attributes: true })
+  })
+}
+
+for (const desktop of [false, true]) {
+  test(`${desktop ? 'Desktop app protocol' : 'Web'} mounts images and restores the host on disable/re-enable`, { skip: hostSkip }, async t => {
+    const h = await host({ desktop })
+    const { Context } = h.seeds['@deepseek-ai/cordis']
+    const ctx = new Context()
+    let unmount
+    t.after(async () => {
+      unmount?.()
+      await ctx.fiber.dispose()
+      h.dom.window.close()
+      assert.deepEqual(h.errors, [])
+    })
+    await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-renderer'))
+    ctx.slots.installLocale({ ...observable({ revision: 0 }), bind: () => (key, values) => values?.labels ?? key })
+    const owner = { sessionId: 'session-a', ctx, session: {
+      ...observable({}), projections: { faceOf: () => observable(undefined) },
+    } }
+    ctx.reflect.provide('sessions', {
+      list: observable({ current: 'session-a', phase: 'ready', ids: ['session-a'], byId: {
+        'session-a': { id: 'session-a', running: false, retainedBy: { mainView: 1 } },
+      } }),
+      binding: id => id === owner.sessionId ? owner : undefined,
+      retainInfo: () => observable({ retainedBy: { mainView: 1 } }),
+    })
+    ctx.reflect.provide('remote', { $on: () => () => {} })
+    ctx.reflect.provide('remoteAccess', { source: () => observable(undefined) })
+    await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-session'))
+    const React = h.seeds.react
+    const imageReads = []
+    const loadImage = async attachment => { imageReads.push(attachment.id); return 'https://example.test/image.png' }
+    const frame = observable({ kind: 'assistant-step', data: {
+      status: 'running', blocks: [{ kind: 'image', attachment: { id: 'output', attachmentId: 'output', width: 80, height: 60 } }, { kind: 'text', text: '**Hello**' }],
+    } })
+    ctx.slots.register({ name: 'root', children: { 'conversation.chat.node': { kind: 'keyed', scope: 'session' } },
+      inject: () => ({ hooks: { frame } }),
+    }, ({ useFrame, renderSlot }) => {
+      const node = useFrame(value => value)
+      return renderSlot('conversation.chat.node', { node, loadImage }, { entryKey: node.kind })
+    })
+    ctx.slots.register({ name: 'conversation.chat.node', key: 'assistant-step', children: {
+      'conversation.chat.message.images': { kind: 'single', scope: 'session' },
+    } }, () => React.createElement('span', null, 'native renderer'))
+    await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-attachment'))
+    const entryErrors = []
+    ctx.slots.onEntryError((_entry, error) => entryErrors.push(error))
+    let plugin = await ctx.plugin(await h.loader.import('dsh-tavern-renderer'))
+    const container = h.dom.window.document.getElementById('test-root')
+    const flush = h.seeds['react-dom'].flushSync
+    unmount = ctx.uiRenderer.mount(container)
+    assert.match(container.innerHTML, /<strong>Hello<\/strong>/)
+    await waitForImage(h.dom, container)
+    assert.equal(container.querySelectorAll('img[src="https://example.test/image.png"]').length, 1)
+    flush(() => frame.set({ kind: 'user', data: { content: [
+      { type: 'image', attachment: { id: 'input', attachmentId: 'input', width: 80, height: 60 } }, { type: 'text', text: '{{user}}' },
+      { type: 'file', attachment: { id: 'notes', name: 'notes.txt', bytes: 12 } },
+    ], referenceLabels: ['Referenced Session'] } }))
+    assert.match(container.textContent, /notes.txt/)
+    assert.match(container.textContent, /Referenced Session/)
+    assert.match(container.textContent, /User/)
+    assert.deepEqual(imageReads, ['output', 'input'])
+    h.dom.window.DeepSeekTavernRenderer.configure({ char: 'Luna' })
+    flush(() => frame.set({ kind: 'assistant-step', data: { status: 'settled', blocks: [{ kind: 'text', text: '{{char}}' }] } }))
+    assert.match(container.textContent, /Luna/)
+    await plugin.dispose()
+    flush(() => {})
+    assert.match(container.textContent, /native renderer/)
+    assert.equal(h.dom.window.document.querySelectorAll('[data-dsh-tavern-owned]').length, 0)
+    plugin = await ctx.plugin(await h.loader.import('dsh-tavern-renderer'))
+    flush(() => {})
+    assert.match(container.textContent, /Luna/)
+    assert.equal(h.dom.window.document.querySelectorAll('[data-dsh-tavern-owned]').length, 3)
+    assert.deepEqual(entryErrors, [])
+  })
 }
 
 async function waitForSlotEntry(slots, name) {
@@ -202,6 +310,7 @@ test('rc.2 real SlotRegistry and UiSession preserve the active RP dock contract'
     retainInfo: id => ({ getSnapshot: () => ({ retainedBy: sessionList.getSnapshot().byId[id]?.retainedBy ?? {} }), subscribe: listener => sessionList.subscribe(listener) }),
   })
   ctx.reflect.provide('remote', remote)
+  ctx.reflect.provide('remoteAccess', { source: () => observable(undefined) })
   await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-session'))
   assert.ok(ctx.slots.hostFace().scope('session'), 'rc.2 UiSession must install the session scope adapter before mount')
   assert.equal(ctx.uiSession.adapter.current.getSnapshot().key, 'session-a')

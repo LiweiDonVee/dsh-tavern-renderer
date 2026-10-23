@@ -1,4 +1,5 @@
 import pluginCss from './plugin.css'
+import { version } from '../../package.json'
 import { createRenderer, ThemeManager } from '../core/index.js'
 import { registerTavernRenderers } from './register.js'
 import { TavernAssistantNode, TavernUserNode } from './renderers.jsx'
@@ -73,7 +74,7 @@ export function apply(ctx) {
 
   const previousApi = window.DeepSeekTavernRenderer
   const api = Object.freeze({
-    version: '0.2.1',
+    version,
     render: (text, context = {}) => rendererFor('__preview__').render(text, context),
     configure(partial = {}) {
       const next = mergeConfig(config, partial)

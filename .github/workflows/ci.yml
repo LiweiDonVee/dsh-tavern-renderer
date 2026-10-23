@@ -9,6 +9,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
+        dsh: [0.2.1-rc.2, 0.2.1-rc.3]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +18,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm install --prefix .host --no-audit --no-fund @deepseek-ai/dsh@0.1.7-rc.2
+      - run: npm install --prefix .host --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh@${{ matrix.dsh }}
       - name: Set host package path
         shell: bash
         run: echo "DSH_HOST_NODE_MODULES=$GITHUB_WORKSPACE/.host/node_modules" >> "$GITHUB_ENV"
