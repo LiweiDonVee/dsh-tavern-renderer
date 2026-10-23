@@ -6,23 +6,39 @@
 
 ## 安装和启用
 
-当前适配目标为 DeepSeek Harness `0.1.7-rc.2`，Node.js 22+。仓库已包含构建后的 `lib/client.js`，本地安装不运行安装脚本。
+当前版本 `0.3.0` 适配 DeepSeek Harness `0.2.1-rc.2` / `0.2.1-rc.3`，支持 Web 和桌面端，要求 Node.js 24+。仓库包含构建后的 `lib/client.js`，宿主安装插件时无需运行构建脚本。旧 DSH `0.1.x` 请继续使用旧插件版本。
+
+### Web
 
 ```powershell
 cd dsh-tavern-renderer
 npm ci
-npm run check
-npx --yes @deepseek-ai/dsh@0.1.7-rc.2 plugin --profile web add .
-npx --yes @deepseek-ai/dsh@0.1.7-rc.2 --profile web
+npx --yes @deepseek-ai/dsh@0.2.1-rc.2 plugin --profile web add .
+npx --yes @deepseek-ai/dsh@0.2.1-rc.2 --profile web
 ```
 
 启动后使用终端打印的完整 Web URL（含一次性 token）进入；不要把 token 固化进配置、分享链接或测试产物。认证由宿主处理，插件无需自行管理 token。
 
-bundle 会向 Web profile 插入 `tavern-renderer` 行。客户端随后以 `priority: -100` 覆盖 `assistant-step`、`user` 和 `steering` 三个消息 renderer。消息 slot 由 `@deepseek-ai/dsh-client-ui-chat` 声明，语言域为 `chat`；图片使用宿主传入的 `renderMessageImages`，保留宿主授权加载。删除插件后原 renderer 自动恢复：
+bundle 会向当前 profile 插入 `tavern-renderer` 行。客户端以 `priority: -100` 覆盖 `assistant-step`、`user` 和 `steering` 三个消息 renderer。消息 slot 由 `@deepseek-ai/dsh-client-ui-chat` 声明，语言域为 `chat`；图片通过官方 `conversation.images.content` Factory 和宿主传入的 `loadImage` 加载。插件不重复声明原生 renderer 的图片子 slot，因此可以与原生组件并存。删除或停用插件后原 renderer 自动恢复：
 
 ```powershell
-npx --yes @deepseek-ai/dsh@0.1.7-rc.2 plugin --profile web remove dsh-tavern-renderer
+npx --yes @deepseek-ai/dsh@0.2.1-rc.2 plugin --profile web remove dsh-tavern-renderer
 ```
+
+### 桌面端
+
+桌面端使用同一套渲染组件，`dsh.client.platform: "web"` 也适用于桌面端；无需改成 `desktop`。但插件安装在独立的 `desktop` profile 中，Web profile 已安装插件不会自动同步过去。
+
+先启动一次桌面端初始化 profile，然后完全退出应用。使用**桌面端随附**的 CLI 安装本地仓库或打包文件，例如 Windows 安装目录中的 `resources/runtime/cli/bin/dsh.cmd`：
+
+```powershell
+# 把下面两个路径替换为实际安装位置与本地仓库绝对路径
+$desktopDsh = 'C:\path\to\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
+& $desktopDsh plugin --profile desktop add 'C:\path\to\dsh-tavern-renderer'
+& $desktopDsh plugin --profile desktop list
+```
+
+重新打开桌面端即可使用。不要用 `npx @deepseek-ai/dsh` 修改桌面端 profile；它由桌面程序管理。卸载同样在应用完全退出后执行 `& $desktopDsh plugin --profile desktop remove dsh-tavern-renderer`。支持桌面端 `dsh-app://app/` 协议、原生授权图片加载和字体/字号设置；主题及配置保存在各客户端自己的 localStorage 中，Web 与桌面端分别保存。
 
 ## 固定渲染顺序
 
@@ -211,9 +227,12 @@ const removeStage = DeepSeekTavernRenderer.registerStage({
 
 ```powershell
 npm test
-npm run build
+npm install --prefix .host --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh@0.2.1-rc.2
+npm run check
 npm pack --dry-run
 ```
+
+`test:host` 默认读取 `.host/node_modules`，也可用 `DSH_HOST_NODE_MODULES` 指向另一套宿主包。CI 在 Windows/Linux 上分别检查 `0.2.1-rc.2` 和 `0.2.1-rc.3`。私有 RP dock 测试仅在提供 `DSH_RP_UI_DIR` 时运行。
 
 测试文件为九项原始验收能力和八种文档模板各提供至少一条“输入 -> 期望输出”样例，并额外覆盖 slot 优先级、编码后的危险协议、SVG/iframe/form、CSS 远程加载、恶意角色模板、文档字段注入与流式草稿。
 
@@ -230,12 +249,12 @@ npm pack --dry-run
 | `registerStage()` / `setStageEnabled()` | 扩展或切换管线阶段 |
 | `setTheme()` / `setCustomCss()` | 切换主题和注入安全作用域 CSS |
 
-页面根节点的 `data-dsh-tavern-renderer-version="0.2.1"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
+页面根节点的 `data-dsh-tavern-renderer-version="0.3.0"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
 
-## DSH 兼容边界（2026-09-28）
+## DSH 兼容边界（2026-10-23）
 
-- Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat`。已按实际 `0.1.7-rc.2` Web manifest 验证完整注入闭包。
+- Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat` 和提供图库 Factory 的 `ui-attachment`。已按实际 `0.2.1-rc.2` / `rc.3` npm 包验证完整注入闭包和 `engines.dsh` 兼容检查，无需版本豁免。
 - 此插件没有 `ApiProxy`、后端 Remote 服务或自定义 settings card；主题/宏配置仍由浏览器 API 和 localStorage 管理，无 settings card 迁移项。
-- 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 V4 Session 日志，也不参与 RP settlement。流式 `running` 与最终 `settled` / `interrupted` 语义保持。
+- 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 V4 Session 日志，也不参与 RP settlement。保留流式 `running` 与最终 `settled` / `interrupted` 语义，并遵循 `groupPart` 和回合思考折叠状态；文件、图片附件保持原始顺序，会话引用标签保持可见。
 - `snapshotEvents`、`eventAt` 和 `ownEvents` 已从渲染器边界排除；agent 生命周期、Profile plugin settings、Remote 双向流和 preset plugin bundles 由宿主负责。渲染器按 Session ID 取得会话作用域，因此多个 Session 可同时拥有独立变量与 renderer 实例。
-- `npm run check` 覆盖核心渲染、slot 优先级/语言域和宿主图片入口；不等同于已做真实浏览器端登录和 UI 验收。
+- `npm run check` 覆盖核心渲染、真实 slot 装配、Session 隔离、授权图片入口，以及 Web / 模拟桌面 `dsh-app://app/` 环境中的停用、重新启用和配置恢复。桌面协议使用 JSDOM 模拟；不等同于在签名 Electron 安装包中完成登录和端到端验收。
