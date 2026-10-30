@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        dsh: [0.2.1-rc.2, 0.2.1-rc.3]
+        dsh: [0.2.1-rc.2, 0.2.1-rc.3, 0.2.1-rc.5]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

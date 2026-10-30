@@ -33,7 +33,7 @@ test('current DSH accepts the renderer without a version exemption', { skip: hos
 
 async function host({ desktop = false } = {}) {
   const frontend = hostPath('dsh-web-frontend', 'dist')
-  assert.match(json(hostPath('dsh-web-frontend', 'package.json')).version, /^0\.2\.1-rc\.[23]$/)
+  assert.match(json(hostPath('dsh-web-frontend', 'package.json')).version, /^0\.2\.1-rc\.(?:2|3|5)$/)
   const html = readFileSync(join(frontend, 'index.html'), 'utf8')
   const entry = resolve(frontend, html.match(/<script type="module"[^>]*src="([^"]+)"/)[1])
   const source = readFileSync(entry, 'utf8')
