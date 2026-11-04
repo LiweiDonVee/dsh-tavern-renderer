@@ -10,10 +10,14 @@ dsh-tavern-renderer/
 │   ├── client/
 │   │   ├── index.jsx           # Cordis apply(), slot registrations, public browser API
 │   │   ├── renderers.jsx       # assistant/user/steering React adapters
+│   │   ├── config.js          # browser-local configuration and revision subscriptions
+│   │   ├── depth.js           # shared per-Session message-depth index
+│   │   ├── regex-chooser.jsx  # minimal Session rule-set import and selection
 │   │   └── plugin.css          # scoped component and built-in theme styles
 │   └── core/
 │       ├── pipeline.js         # ordered, pluggable, switchable stage runner
 │       ├── regex.js            # compact/ST-shaped regex rule parser and executor
+│       ├── regex-import.js     # pure ST object/array/preset extraction
 │       ├── macros.js           # registry, built-ins, variables, bounded nesting
 │       ├── expression.js       # restricted tokenizer/parser/evaluator
 │       ├── documents.js        # declarative document parser and eight safe templates
@@ -54,6 +58,8 @@ Every text stage receives a string and immutable render metadata and returns a s
 
 Regex replacement macros use the same macro registry and variable map as the later full macro pass. This is required for capture-dependent `setvar` and `{{char}}` substitutions. Rendering errors are isolated to their stage and produce inert visible text; they do not abort the conversation renderer.
 
+Regex rules have separate legacy and ST dialects. Legacy callers retain their original defaults and replacement semantics. ST eligibility and capture expansion follow the documented display subset; a bad rule produces its own diagnostic. Source records are preserved separately from normalized execution objects. Caller-supplied variable Maps are copied into display state, while renderer-owned variables retain their existing local behavior.
+
 The document stage parses only fixed `:::type` directives. It renders body Markdown early, replaces each complete document with a private-use sentinel, and lets the normal Markdown stage process surrounding prose before restoring generated HTML. This avoids invalid nested paragraph wrappers while preserving one final sanitizer boundary. Field values are escaped; only internal type/variant tables can select CSS classes.
 
 ## 3. Harness coupling
@@ -72,9 +78,13 @@ The adapter renders image groups through the public `conversation.images.content
 
 Assistant nodes receive Harness's `status === 'running'` as render context. Harness already replaces the partial node on every stream frame, so React's existing memo boundaries remain valid. The plugin uses the flag only to render an unfinished known document as a live draft; no timers, observers, or Harness core patches are introduced.
 
+The Session header's public `conversation.session.header.utilities` slot owns the small display-regex chooser. It receives the standard Session ID; every import/selection API requires an explicit Session ID. Public `useChat` and `useSession` supply the loaded tail and open state for depth. A shared index scans only when order/store identity changes, and each row subscribes to its scalar depth. Reasoning prepares a display copy using the rc.5 signature boundary, then derives its summary from the sanitized displayed HTML; raw reasoning never leaks through an unchanged summary after regex replacement.
+
 ## 4. State and configuration
 
 One renderer/variable map is created per Harness Session ID in the client apply closure. There are no module-level Session stores. Plugin disposal clears all maps, style nodes, global API, and event listeners.
+
+`regexRuleSets` stores imported files as separate ordered sets and `sessionRegexSelections` stores each Session's choice. Undefined means the legacy global `regexRules`; null means disabled; a set ID replaces global regex for that Session. No choice is inherited from another Session. These are client display preferences, with no HostConfig, remote endpoint or Session event. The stable config store uses `useSyncExternalStore` to invalidate mounted memoized views, reports storage failures, and rejects writes after disposal.
 
 The browser API is exposed as `window.DeepSeekTavernRenderer`:
 
@@ -82,6 +92,7 @@ The browser API is exposed as `window.DeepSeekTavernRenderer`:
 - `render(text, context)` offers a test/extension entry point;
 - `setTheme(name)`, `setCustomCss(css)`, `getConfig()` manage appearance;
 - `registerMacro`, `unregisterMacro`, `registerStage`, `setStageEnabled` extend the pipeline.
+- `importRegexRuleSet(input, {sessionId, name})`, `selectRegexRuleSet(sessionId, selection)`, `getRegexRuleSets()`, `getRegexSelection(sessionId)` and `deleteRegexRuleSet(id)` share the chooser's display-only operations.
 
 Theme name, serializable renderer configuration, and safe custom CSS persist in `localStorage`. Custom CSS is user-authored appearance configuration but is still stripped of imports/URLs/dynamic declarations and scoped under `[data-dsh-tavern-renderer]`. Message HTML is always untrusted, and role templates receive a final allowlist pass after wrapping.
 
@@ -131,4 +142,4 @@ Theme name, serializable renderer configuration, and safe custom CSS persist in 
 
 ## 8. Host version boundary
 
-The current adapter targets npm DSH 0.2.1-rc.2 and 0.2.1-rc.3. Its `engines.dsh` range is `>=0.2.1-rc.2 <0.3.0-0`; optional peer ranges also accept both tested releases. Desktop shares the Web client module table and `platform: "web"`, runs under `dsh-app://app/`, and uses its own `desktop` profile. Installation into that profile uses the Desktop-bundled CLI while the app is closed. Text/code fonts and content sizes use host CSS variables. Web launch-token authentication, V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote transport stay in the host. Renderer preferences remain local to each client's origin; no settings card or ApiProxy endpoint needs migration. The renderer never treats display nodes as the RP settlement or canonical state surface, and does not call deprecated `snapshotEvents`, `eventAt`, or `ownEvents` APIs.
+The current adapter targets npm DSH 0.2.1-rc.2, rc.3 and rc.5. Its `engines.dsh` range is `>=0.2.1-rc.2 <0.3.0-0`; optional peer ranges accept these releases. Desktop shares the Web client module table and `platform: "web"`, runs under `dsh-app://app/`, and uses its own `desktop` profile. Installation into that profile uses the Desktop-bundled CLI while the app is closed. Text/code fonts and content sizes use host CSS variables. Web launch-token authentication, V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote transport stay in the host. Renderer preferences remain local to each client's origin; no settings card or ApiProxy endpoint needs migration. The renderer never treats display nodes as the RP settlement or canonical state surface, and does not call deprecated `snapshotEvents`, `eventAt`, or `ownEvents` APIs.

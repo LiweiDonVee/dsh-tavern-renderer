@@ -1,5 +1,14 @@
 # Quality review record
 
+## 0.4.0 display-regex update — 2026-11-04
+
+- Separate ST and legacy behavior; preserve the old API and the preexisting legacy `{{match}}` limitation.
+- Cover whole-preset extraction, display gates, placements, capture/trim macros, find substitution, depth, invalid neighbors, source/variable isolation, and sanitizer behavior.
+- Cover immediate mounted-message updates, the real header utilities slot and Modal, Session selection persistence, and unload restoration through the shipped module table on DSH rc.2, rc.3 and rc.5.
+- Local checks: 70 unit tests, build, and five host-contract tests per DSH version passed. One private RP dock fixture was skipped because `DSH_RP_UI_DIR` was unset. These module/JSDOM checks are distinct from final tarball installation and native browser acceptance.
+
+## Original document-extension review
+
 Date: 2026-08-15
 
 This record covers the requested three explicit `review -> improve` passes after the first complete implementation baseline. It records concrete findings rather than treating a passing feature test as sufficient evidence.

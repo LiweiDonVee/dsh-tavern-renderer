@@ -1,41 +1,13 @@
 import pluginCss from './plugin.css'
 import { version } from '../../package.json'
-import { createRenderer, ThemeManager } from '../core/index.js'
+import { createRenderer, parseRegexImport, ThemeManager } from '../core/index.js'
 import { registerTavernRenderers } from './register.js'
 import { TavernAssistantNode, TavernUserNode } from './renderers.jsx'
+import { createConfigStore } from './config.js'
+import { createDepthIndex } from './depth.js'
+import { RegexChooser } from './regex-chooser.jsx'
 
 export const inject = ['slots']
-
-const CONFIG_KEY = 'dsh-tavern-renderer.config'
-const DEFAULT_CONFIG = Object.freeze({
-  char: 'Assistant',
-  user: 'User',
-  regexRules: [],
-  stages: {},
-  templates: {},
-})
-
-function loadConfig() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(CONFIG_KEY) ?? 'null')
-    return stored !== null && typeof stored === 'object' ? { ...DEFAULT_CONFIG, ...stored } : { ...DEFAULT_CONFIG }
-  } catch {
-    return { ...DEFAULT_CONFIG }
-  }
-}
-
-function saveConfig(config) {
-  try { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)) } catch { /* Storage can be disabled. */ }
-}
-
-function mergeConfig(current, partial) {
-  return {
-    ...current,
-    ...partial,
-    stages: { ...current.stages, ...(partial.stages ?? {}) },
-    templates: { ...current.templates, ...(partial.templates ?? {}) },
-  }
-}
 
 export function apply(ctx) {
   const theme = new ThemeManager(document)
@@ -45,17 +17,34 @@ export function apply(ctx) {
   componentStyle.textContent = pluginCss
   document.head.append(componentStyle)
 
-  let config = loadConfig()
-  // Validate persisted data before any Session can consume it.
-  try { createRenderer(config) } catch { config = { ...DEFAULT_CONFIG } }
   const renderers = new Map()
+  const sessionTools = new Map()
   const macroExtensions = new Map()
   const stageExtensions = new Map()
+  let storage
+  try { storage = localStorage } catch { /* The chooser reports disabled storage. */ }
+  const configStore = createConfigStore(storage, config => {
+    createRenderer(config)
+    if (!Array.isArray(config.regexRuleSets)) throw new TypeError('regexRuleSets must be an array')
+    if (config.sessionRegexSelections === null || typeof config.sessionRegexSelections !== 'object') {
+      throw new TypeError('sessionRegexSelections must be an object')
+    }
+  }, () => renderers.clear())
+
+  const rulesFor = sessionId => {
+    const config = configStore.current()
+    if (sessionId === '__preview__') return config.regexRules
+    const selection = config.sessionRegexSelections[sessionId]
+    if (selection === undefined) return config.regexRules
+    if (selection === null) return []
+    return config.regexRuleSets.find(set => set.id === selection)?.rules ?? []
+  }
 
   const rendererFor = sessionId => {
     let renderer = renderers.get(sessionId)
     if (renderer !== undefined) return renderer
-    renderer = createRenderer(config)
+    const config = configStore.current()
+    renderer = createRenderer({ ...config, regexRules: rulesFor(sessionId) })
     for (const [name, resolver] of macroExtensions) renderer.registerMacro(name, resolver)
     for (const stage of stageExtensions.values()) {
       renderer.registerStage(stage)
@@ -66,10 +55,16 @@ export function apply(ctx) {
   }
 
   const renderTavern = sessionId => (text, context = {}) => rendererFor(sessionId).render(text, context)
+  const toolsFor = sessionId => {
+    if (!sessionTools.has(sessionId)) sessionTools.set(sessionId, {
+      renderTavern: renderTavern(sessionId), renderConfig: configStore, depthIndex: createDepthIndex(),
+    })
+    return sessionTools.get(sessionId)
+  }
   const disposeSlots = registerTavernRenderers(
     ctx,
     { assistant: TavernAssistantNode, user: TavernUserNode },
-    sessionId => ({ renderTavern: renderTavern(sessionId) }),
+    toolsFor,
   )
 
   const previousApi = window.DeepSeekTavernRenderer
@@ -77,14 +72,44 @@ export function apply(ctx) {
     version,
     render: (text, context = {}) => rendererFor('__preview__').render(text, context),
     configure(partial = {}) {
-      const next = mergeConfig(config, partial)
-      createRenderer(next)
-      config = next
-      saveConfig(config)
-      renderers.clear()
-      return this.getConfig()
+      return configStore.configure(partial)
     },
-    getConfig: () => JSON.parse(JSON.stringify(config)),
+    getConfig: () => configStore.getConfig(),
+    getRegexRuleSets: () => JSON.parse(JSON.stringify(configStore.current().regexRuleSets)),
+    getRegexSelection: sessionId => configStore.current().sessionRegexSelections[requiredSession(sessionId)],
+    selectRegexRuleSet(sessionId, selection) {
+      requiredSession(sessionId)
+      const config = configStore.current()
+      if (selection !== undefined && selection !== null && !config.regexRuleSets.some(set => set.id === selection)) {
+        throw new Error('unknown regex rule set')
+      }
+      const selections = { ...config.sessionRegexSelections }
+      if (selection === undefined) delete selections[sessionId]
+      else selections[sessionId] = selection
+      configStore.configure({ sessionRegexSelections: selections })
+      return selection
+    },
+    importRegexRuleSet(input, { sessionId, name = '导入的正则' } = {}) {
+      requiredSession(sessionId)
+      const imported = parseRegexImport(input)
+      if (imported.rules.length === 0) return imported
+      const config = configStore.current()
+      const ruleSet = { id: `regex-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+        name: String(name), source: imported.source, rules: imported.rules, summary: imported.summary }
+      configStore.configure({
+        regexRuleSets: [...config.regexRuleSets, ruleSet],
+        sessionRegexSelections: { ...config.sessionRegexSelections, [sessionId]: ruleSet.id },
+      })
+      return { ...imported, id: ruleSet.id, storageError: configStore.getStorageError() }
+    },
+    deleteRegexRuleSet(id) {
+      const config = configStore.current()
+      configStore.configure({
+        regexRuleSets: config.regexRuleSets.filter(set => set.id !== id),
+        sessionRegexSelections: Object.fromEntries(Object.entries(config.sessionRegexSelections)
+          .map(([sessionId, selection]) => [sessionId, selection === id ? null : selection])),
+      })
+    },
     setTheme: name => theme.setTheme(name),
     setCustomCss: css => theme.setCustomCss(css),
     getTheme: () => theme.theme,
@@ -104,7 +129,7 @@ export function apply(ctx) {
     registerStage(stage) {
       if (stageExtensions.has(stage.name)) throw new Error(`stage already registered: ${stage.name}`)
       // Validate placement against a disposable renderer before publishing it.
-      createRenderer(config).registerStage(stage)
+      createRenderer(configStore.current()).registerStage(stage)
       stageExtensions.set(stage.name, stage)
       for (const renderer of renderers.values()) renderer.registerStage(stage)
       return () => {
@@ -113,21 +138,32 @@ export function apply(ctx) {
       }
     },
     setStageEnabled(name, enabled) {
-      config = mergeConfig(config, { stages: { [name]: Boolean(enabled) } })
-      saveConfig(config)
-      for (const renderer of renderers.values()) renderer.setStageEnabled(name, enabled)
+      configStore.configure({ stages: { [name]: Boolean(enabled) } })
     },
   })
   window.DeepSeekTavernRenderer = api
   document.documentElement.dataset.dshTavernRendererVersion = api.version
 
+  const disposeChooser = ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities', id: 'tavern-regex', order: 20,
+    inject: () => ({ configStore, regexApi: api }),
+  }, RegexChooser))
+
   ctx.effect(() => () => {
     disposeSlots()
+    disposeChooser()
     renderers.clear()
+    sessionTools.clear()
+    configStore.dispose()
     componentStyle.remove()
     theme.dispose()
     if (previousApi === undefined) delete window.DeepSeekTavernRenderer
     else window.DeepSeekTavernRenderer = previousApi
     delete document.documentElement.dataset.dshTavernRendererVersion
   }, 'dsh-tavern-renderer: client lifecycle')
+}
+
+function requiredSession(sessionId) {
+  if (typeof sessionId !== 'string' || sessionId === '') throw new TypeError('sessionId is required')
+  return sessionId
 }

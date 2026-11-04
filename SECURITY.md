@@ -1,7 +1,7 @@
 # Security and privacy
 
 This is an independent community plugin, not an official DeepSeek product.
-Tested compatibility is DSH 0.1.7-rc.2. A plugin executes with its host's permissions;
+Compatibility targets DSH 0.2.1-rc.2, rc.3 and rc.5. A plugin executes with its host's permissions;
 this package is not a sandbox. Only install code you trust.
 
 Do not include real keys, private prompts, session logs or database exports in public issues.

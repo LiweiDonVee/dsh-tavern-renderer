@@ -5,6 +5,36 @@
   line-height: 1.75;
 }
 
+.dsh-tr-regex-trigger {
+  border: 1px solid var(--dtr-border, currentColor);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.dsh-tr-regex-dialog { width: min(560px, calc(100vw - 32px)); }
+.dsh-tr-regex-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.dsh-tr-regex-controls label { display: flex; min-width: 180px; flex: 1; flex-direction: column; gap: 6px; }
+.dsh-tr-regex-controls select,
+.dsh-tr-regex-controls button,
+.dsh-tr-regex-delete {
+  border: 1px solid var(--dtr-border, currentColor);
+  border-radius: 6px;
+  background: var(--dtr-surface, transparent);
+  color: inherit;
+  padding: 8px 10px;
+  font: inherit;
+}
+.dsh-tr-regex-controls button, .dsh-tr-regex-delete { cursor: pointer; }
+.dsh-tr-regex-note, .dsh-tr-regex-info { font-size: 13px; line-height: 1.6; opacity: 0.8; }
+.dsh-tr-regex-info { max-height: 220px; overflow: auto; }
+.dsh-tr-regex-info li { margin: 8px 0; overflow-wrap: anywhere; }
+.dsh-tr-regex-delete { margin-top: 12px; }
+
 .dsh-tr-root {
   display: flex;
   min-width: 0;

@@ -113,3 +113,22 @@ it('keeps completed reasoning hidden with its collapsed turn process', () => {
   expect(html).toMatch(/hidden[^>]*>[\s\S]*private thought/)
   expect(html).toContain('public answer')
 })
+
+it('prepares rc.5 reasoning display text and derives summaries from the regexed sanitized result', () => {
+  const renderer = createRenderer({ regexRules: [{
+    format: 'sillytavern', findRegex: '/secret/g', replaceString: 'visible', placement: [6], markdownOnly: true,
+  }] })
+  const node = { data: { status: 'settled', blocks: [{ kind: 'reasoning', text: '<signature>host metadata</signature>\nsecret thought' }] } }
+  const before = JSON.stringify(node)
+  const html = renderToStaticMarkup(React.createElement(components.TavernAssistantNode, {
+    ...props(), node, renderTavern: (text, context) => renderer.render(text, context),
+  }))
+  expect(html).toContain('visible thought')
+  expect(html).not.toContain('secret')
+  expect(html).not.toContain('host metadata')
+  expect(JSON.stringify(node)).toBe(before)
+  const prefix = renderToStaticMarkup(React.createElement(components.TavernAssistantNode, {
+    ...props(), node: { data: { status: 'running', blocks: [{ kind: 'reasoning', text: '<sign' }] } },
+  }))
+  expect(prefix).not.toContain('dsh-tr-reasoning')
+})

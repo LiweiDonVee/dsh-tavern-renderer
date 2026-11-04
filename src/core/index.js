@@ -1,5 +1,6 @@
 export { createRenderer, RenderPipeline, TavernRenderer } from './pipeline.js'
 export { applyRegexRules, parseRegexRule } from './regex.js'
+export { parseRegexImport } from './regex-import.js'
 export { createMacroEngine, MacroEngine, MacroRegistry } from './macros.js'
 export { evaluateInlineExpressions, safeEvaluateExpression } from './expression.js'
 export {

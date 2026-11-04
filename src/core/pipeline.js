@@ -2,7 +2,7 @@ import { evaluateInlineExpressions } from './expression.js'
 import { extractDocumentBlocks, restoreDocumentBlocks } from './documents.js'
 import { createMacroEngine } from './macros.js'
 import { markdownToHtml } from './markdown.js'
-import { applyRegexRules, parseRegexRule } from './regex.js'
+import { applyRegexRules, normalizeRegexRules } from './regex.js'
 import { sanitizeHtml } from './sanitize.js'
 import { applyRoleTemplate, DEFAULT_TEMPLATES } from './templates.js'
 
@@ -110,8 +110,8 @@ export class TavernRenderer {
       ...suppliedOptions,
     }
     this.options.templates = { ...DEFAULT_TEMPLATES, ...(suppliedOptions.templates ?? {}) }
-    this.options.regexRules = (suppliedOptions.regexRules ?? []).map(parseRegexRule)
-    this.variables = suppliedOptions.variables instanceof Map ? suppliedOptions.variables : new Map()
+    this.options.regexRules = normalizeRegexRules(suppliedOptions.regexRules ?? [])
+    this.variables = suppliedOptions.variables instanceof Map ? new Map(suppliedOptions.variables) : new Map()
     this.macros = suppliedOptions.macros ?? createMacroEngine()
     this.pipeline = new RenderPipeline([
       {
@@ -159,6 +159,7 @@ export class TavernRenderer {
       variables: this.variables,
       ...suppliedContext,
     }
+    if (suppliedContext.variables instanceof Map) context.variables = new Map(suppliedContext.variables)
     if (!(context.variables instanceof Map)) context.variables = new Map(Object.entries(context.variables ?? {}))
     const diagnostics = []
     const result = this.pipeline.run(source.replace(/\r\n?/g, '\n'), {
@@ -168,7 +169,7 @@ export class TavernRenderer {
   }
 
   configure(partial = {}) {
-    if (partial.regexRules !== undefined) this.options.regexRules = partial.regexRules.map(parseRegexRule)
+    if (partial.regexRules !== undefined) this.options.regexRules = normalizeRegexRules(partial.regexRules)
     if (partial.templates !== undefined) this.options.templates = { ...this.options.templates, ...partial.templates }
     if (partial.stages !== undefined) {
       for (const [name, enabled] of Object.entries(partial.stages)) this.setStageEnabled(name, enabled)
