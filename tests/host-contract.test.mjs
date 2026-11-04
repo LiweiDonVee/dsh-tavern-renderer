@@ -116,7 +116,7 @@ test('Web loads renderer through the shipped injection graph and primitives', { 
   const plugin = await h.loader.import('dsh-tavern-renderer')
   assert.deepEqual(Array.from(plugin.inject), ['slots'])
   const primitives = h.seeds['@deepseek-ai/dsh-client-ui-primitives']
-  for (const name of ['FileTypeIcon', 'fileSizeText', 'IconCheckOutlineRegular', 'IconCopyOutlineRegular', 'IconThinkOutlineRegular', 'JsonBlock', 'Tooltip', 'writeClipboard']) {
+  for (const name of ['FileTypeIcon', 'fileSizeText', 'IconCheckOutlineRegular', 'IconCopyOutlineRegular', 'IconThinkOutlineRegular', 'JsonBlock', 'Modal', 'Tooltip', 'writeClipboard']) {
     assert.equal(typeof primitives[name], 'function', `missing candidate primitive: ${name}`)
   }
   assert.equal(typeof plugin.apply, 'function')
@@ -221,11 +221,16 @@ for (const desktop of [false, true]) {
     const frame = observable({ kind: 'assistant-step', data: {
       status: 'running', blocks: [{ kind: 'image', attachment: { id: 'output', attachmentId: 'output', width: 80, height: 60 } }, { kind: 'text', text: '**Hello**' }],
     } })
-    ctx.slots.register({ name: 'root', children: { 'conversation.chat.node': { kind: 'keyed', scope: 'session' } },
+    ctx.slots.register({ name: 'root', children: {
+      'conversation.chat.node': { kind: 'keyed', scope: 'session' },
+      'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
+    },
       inject: () => ({ hooks: { frame } }),
     }, ({ useFrame, renderSlot }) => {
       const node = useFrame(value => value)
-      return renderSlot('conversation.chat.node', { node, loadImage }, { entryKey: node.kind })
+      return React.createElement('main', null,
+        renderSlot('conversation.session.header.utilities', {}),
+        renderSlot('conversation.chat.node', { node, loadImage }, { entryKey: node.kind }))
     })
     ctx.slots.register({ name: 'conversation.chat.node', key: 'assistant-step', children: {
       'conversation.chat.message.images': { kind: 'single', scope: 'session' },
@@ -248,16 +253,47 @@ for (const desktop of [false, true]) {
     assert.match(container.textContent, /Referenced Session/)
     assert.match(container.textContent, /User/)
     assert.deepEqual(imageReads, ['output', 'input'])
+    const original = JSON.stringify(frame.getSnapshot())
+    const api = h.dom.window.DeepSeekTavernRenderer
+    const chooser = container.querySelector('[aria-label="显示正则"]')
+    assert.ok(chooser, 'session header owns a display regex chooser')
+    flush(() => chooser.click())
+    assert.ok(h.dom.window.document.querySelector('[role="dialog"][aria-label="显示正则"]'))
+    let imported
+    flush(() => { imported = api.importRegexRuleSet({ extensions: { regex_scripts: [{
+      scriptName: 'user fixture', findRegex: '/\\{\\{user\\}\\}/g', replaceString: 'display-only',
+      placement: [1], markdownOnly: true,
+    }] } }, { sessionId: 'session-a', name: 'Fixture Set' }) })
+    assert.match(container.textContent, /display-only/)
+    assert.equal(api.getRegexSelection('session-a'), imported.id)
+    assert.equal(api.getRegexSelection('session-b'), undefined)
+    const select = h.dom.window.document.querySelector('[aria-label="本会话规则集"]')
+    flush(() => {
+      select.value = ''
+      select.dispatchEvent(new h.dom.window.Event('change', { bubbles: true }))
+    })
+    assert.equal(api.getRegexSelection('session-a'), null)
+    assert.match(container.textContent, /User/)
+    assert.doesNotMatch(container.textContent, /display-only/)
+    flush(() => {
+      select.value = imported.id
+      select.dispatchEvent(new h.dom.window.Event('change', { bubbles: true }))
+    })
+    assert.match(container.textContent, /display-only/)
+    assert.equal(JSON.stringify(frame.getSnapshot()), original)
+    flush(() => h.dom.window.document.querySelector('[aria-label="关闭显示正则"]').click())
     h.dom.window.DeepSeekTavernRenderer.configure({ char: 'Luna' })
     flush(() => frame.set({ kind: 'assistant-step', data: { status: 'settled', blocks: [{ kind: 'text', text: '{{char}}' }] } }))
     assert.match(container.textContent, /Luna/)
     await plugin.dispose()
     flush(() => {})
     assert.match(container.textContent, /native renderer/)
+    assert.equal(h.dom.window.document.querySelector('[aria-label="显示正则"]'), null)
     assert.equal(h.dom.window.document.querySelectorAll('[data-dsh-tavern-owned]').length, 0)
     plugin = await ctx.plugin(await h.loader.import('dsh-tavern-renderer'))
     flush(() => {})
     assert.match(container.textContent, /Luna/)
+    assert.equal(h.dom.window.DeepSeekTavernRenderer.getRegexSelection('session-a'), imported.id)
     assert.equal(h.dom.window.document.querySelectorAll('[data-dsh-tavern-owned]').length, 3)
     assert.deepEqual(entryErrors, [])
   })

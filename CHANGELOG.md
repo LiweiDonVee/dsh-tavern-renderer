@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-11-04
+
+- Import a single ST regex, an array, or `extensions.regex_scripts` from a complete ST preset as an ordered display rule set.
+- Add a small session-header chooser: import and select for this Session, choose none, or delete a saved set; persist each Session's choice and rerender existing messages immediately.
+- Distinguish ST display semantics from the legacy API: display eligibility, user/assistant/reasoning placement, disabled/edit/depth filters, capture/trim macros, and raw/escaped find substitution.
+- Preserve raw copying, original messages, durable Session history, model input, and independent core consumers. Other preset extensions remain inert.
+- Isolate invalid rules with diagnostics, retain the sanitizer boundary, and align reasoning preparation and summaries with the displayed result.
+
 ## 0.3.0 — 2026-10-23
 
 - Support DSH 0.2.1-rc.2 and 0.2.1-rc.3 on Web and Desktop; declare `engines.dsh` and compatible optional peers.

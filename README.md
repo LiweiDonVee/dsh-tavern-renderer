@@ -6,7 +6,7 @@
 
 ## 安装和启用
 
-当前版本 `0.3.0` 适配 DeepSeek Harness `0.2.1-rc.2` / `0.2.1-rc.3`，支持 Web 和桌面端，要求 Node.js 24+。仓库包含构建后的 `lib/client.js`，宿主安装插件时无需运行构建脚本。旧 DSH `0.1.x` 请继续使用旧插件版本。
+当前版本 `0.4.0` 适配 DeepSeek Harness `0.2.1-rc.2` / `0.2.1-rc.3` / `0.2.1-rc.5`，支持 Web 和桌面端，要求 Node.js 24+。发布包包含构建后的 `lib/client.js`，宿主安装插件时无需运行构建脚本。旧 DSH `0.1.x` 请继续使用旧插件版本。
 
 ### Web
 
@@ -50,7 +50,13 @@ regex -> macros -> expressions -> documents -> markdown -> sanitize -> template
 
 ## 正则替换
 
-紧凑语法是 `/pattern/replacement/flags`：
+在会话顶部点击 **显示正则**，再点 **导入并用于本会话**，选择 JSON 文件。支持单条 ST 正则、正则数组，以及整份 ST 预设中的 `extensions.regex_scripts`。导入后只给当前会话选择这一规则集；其它会话分别选择。下拉框选 **无** 即可停用，无需刷新已有消息。
+
+只运行 ST 的显示分支（`markdownOnly: true`），保留禁用、仅 prompt 和不支持的规则并显示说明。不会执行预设中的其它扩展脚本，不会修改原始 JSON 文件、原文复制、Session 记录或模型输入。规则库和会话选择保存在当前浏览器的 localStorage，Web 与桌面端分别保存；保存失败会在面板提示。
+
+ST 规则按文件顺序执行，位置 `1` 为用户/引导消息、`2` 为助手正文、`6` 为推理。原生聊天的深度从最新消息 `0` 倒数，用户/引导/助手节点各算一条，推理与正文共用所在消息的深度。未能确认深度时，有界规则跳过并报告 `DEPTH_UNAVAILABLE`。正文和推理产生的 HTML/CSS 仍经过安全清洗。
+
+旧版浏览器 API 继续支持紧凑 `/pattern/replacement/flags` 语法：
 
 ```js
 DeepSeekTavernRenderer.configure({
@@ -60,7 +66,7 @@ DeepSeekTavernRenderer.configure({
 })
 ```
 
-也可使用接近 SillyTavern 存储结构的对象：
+只有 `findRegex/replaceString/roles` 等旧字段的对象也保持原行为：
 
 ```js
 DeepSeekTavernRenderer.configure({
@@ -74,7 +80,21 @@ DeepSeekTavernRenderer.configure({
 })
 ```
 
-支持 `$1..$99`、`$<name>`、`$&`、`$$` 和 `{{match}}`。捕获组插值后立即求值替换串中的宏；规则按数组顺序串行执行。
+旧规则保留 `$1..$99`、`$<name>`、`$&` 和 `$$` 语义，无斜杠表达式默认全局匹配；legacy 的 `{{match}}` 维持既有未展开行为，完整匹配请用 `$&`。导入的 ST 规则使用独立方言：无斜杠表达式默认只替换第一处；`$0` / `{{match}}` 为完整匹配，数字捕获按完整索引处理（`$12` 不回退为 `$1` 加 `2`），未知捕获为空，其它 JavaScript 特殊替换符保持字面值（如 `$&` 和 `$$`）。trimStrings 对每个插入的捕获先展开宏再作字面删除，之后才展开完整替换串的宏。
+
+ST 的 `substituteRegex` 支持 `0` 不展开查找宏、`1` 原样展开、`2` 仅转义宏返回值中的正则字符。宏能力限于本插件已有 registry；未知宏保留并报告诊断。`runOnEdit` 只在调用者明确传入 `isEdit: true` 时筛选，普通流式更新和重渲染不属于编辑。
+
+程序接口也可导入并为明确会话选择规则集：
+
+```js
+const imported = DeepSeekTavernRenderer.importRegexRuleSet(presetJson, {
+  sessionId: '具体会话 ID', name: '我的显示规则',
+})
+DeepSeekTavernRenderer.selectRegexRuleSet('具体会话 ID', null) // 停用全部正则
+DeepSeekTavernRenderer.selectRegexRuleSet('具体会话 ID', imported.id)
+```
+
+未选择过的会话沿用历史 `configure({regexRules})` 全局规则；选择规则集后只运行所选集，选择“无”则全部停用。`render()` 仍使用全局配置。独立使用 `dsh-tavern-renderer/core` 的客户端显式传入 `regexRules` 与 `context.depth/placement`；它们不会自动读取原生聊天的浏览器选择。
 
 ## 宏和变量
 
@@ -249,12 +269,12 @@ npm pack --dry-run
 | `registerStage()` / `setStageEnabled()` | 扩展或切换管线阶段 |
 | `setTheme()` / `setCustomCss()` | 切换主题和注入安全作用域 CSS |
 
-页面根节点的 `data-dsh-tavern-renderer-version="0.3.0"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
+页面根节点的 `data-dsh-tavern-renderer-version="0.4.0"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
 
 ## DSH 兼容边界（2026-10-23）
 
 - Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat` 和提供图库 Factory 的 `ui-attachment`。已按实际 `0.2.1-rc.2` / `rc.3` npm 包验证完整注入闭包和 `engines.dsh` 兼容检查，无需版本豁免。
-- 此插件没有 `ApiProxy`、后端 Remote 服务或自定义 settings card；主题/宏配置仍由浏览器 API 和 localStorage 管理，无 settings card 迁移项。
+- 此插件没有 `ApiProxy`、后端 Remote 服务或自定义 settings card；会话显示正则入口使用公开的 `conversation.session.header.utilities`，主题/宏配置继续由浏览器 API 和 localStorage 管理。
 - 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 V4 Session 日志，也不参与 RP settlement。保留流式 `running` 与最终 `settled` / `interrupted` 语义，并遵循 `groupPart` 和回合思考折叠状态；文件、图片附件保持原始顺序，会话引用标签保持可见。
 - `snapshotEvents`、`eventAt` 和 `ownEvents` 已从渲染器边界排除；agent 生命周期、Profile plugin settings、Remote 双向流和 preset plugin bundles 由宿主负责。渲染器按 Session ID 取得会话作用域，因此多个 Session 可同时拥有独立变量与 renderer 实例。
 - `npm run check` 覆盖核心渲染、真实 slot 装配、Session 隔离、授权图片入口，以及 Web / 模拟桌面 `dsh-app://app/` 环境中的停用、重新启用和配置恢复。桌面协议使用 JSDOM 模拟；不等同于在签名 Electron 安装包中完成登录和端到端验收。

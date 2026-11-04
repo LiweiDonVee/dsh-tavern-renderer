@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   FileTypeIcon, fileSizeText, IconCheckOutlineRegular, IconCopyOutlineRegular, IconThinkOutlineRegular, JsonBlock, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -39,12 +39,42 @@ function CopyAction({ text, t }) {
   )
 }
 
-function ReasoningBlock({ text, running, renderTavern, hidden, t }) {
-  const summary = (running ? text.trimEnd().split('\n').at(-1) : text.split('\n')[0]) || 'Think'
+const noSubscribe = () => () => {}
+const zeroRevision = () => 0
+
+function useRenderRevision(renderConfig) {
+  return useSyncExternalStore(renderConfig?.subscribe ?? noSubscribe, renderConfig?.getSnapshot ?? zeroRevision, renderConfig?.getSnapshot ?? zeroRevision)
+}
+
+function useMessageDepth(node, useSession, useChat, depthIndex) {
+  const open = useSession?.(session => session.openState === 'open') === true
+  const depth = useChat?.(snapshot => depthIndex?.(snapshot).get(node.key))
+  return open ? depth : undefined
+}
+
+/** Match rc.5's display boundary while retaining the original reasoning block for the Host. */
+function displayReasoning(source) {
+  const opening = '<signature>'
+  if (source !== '' && opening.startsWith(source)) return ''
+  if (!source.startsWith(opening)) return source
+  const end = source.indexOf('</signature>', opening.length)
+  return end === -1 ? '' : source.slice(end + '</signature>'.length).replace(/^(?:\r?\n)*/, '')
+}
+
+function summaryOf(html) {
+  const parsed = new window.DOMParser().parseFromString(html, 'text/html')
+  for (const style of parsed.querySelectorAll('style')) style.remove()
+  return (parsed.body.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 180)
+}
+
+function ReasoningBlock({ text: rawText, running, renderTavern, hidden, t, revision, depth }) {
+  const text = displayReasoning(rawText)
   const result = useMemo(
-    () => renderTavern(text, { role: 'assistant', streaming: running }),
-    [renderTavern, running, text],
+    () => renderTavern(text, { role: 'assistant', placement: 6, part: 'reasoning', streaming: running, depth }),
+    [renderTavern, running, text, revision, depth],
   )
+  const summary = useMemo(() => summaryOf(result.html), [result.html])
+  if (text === '') return null
   return (
     <details className="dsh-tr-reasoning" hidden={hidden || undefined} data-running={running || undefined}>
       <summary>
@@ -57,7 +87,9 @@ function ReasoningBlock({ text, running, renderTavern, hidden, t }) {
   )
 }
 
-export const TavernAssistantNode = memo(function TavernAssistantNode({ node, groupPart, turnProcess, renderFactorySlot, loadImage, renderTavern, t }) {
+export const TavernAssistantNode = memo(function TavernAssistantNode({ node, groupPart, turnProcess, renderFactorySlot, loadImage, renderTavern, renderConfig, useSession, useChat, depthIndex, t }) {
+  const revision = useRenderRevision(renderConfig)
+  const depth = useMessageDepth(node, useSession, useChat, depthIndex)
   const { blocks, status } = node.data
   const streaming = status === 'running'
   const reasoningHidden = turnProcess?.foldable === true && !turnProcess.open
@@ -69,7 +101,7 @@ export const TavernAssistantNode = memo(function TavernAssistantNode({ node, gro
     if (groupPart === 'reasoning' && block.kind !== 'reasoning') continue
     if (groupPart === 'response' && block.kind === 'reasoning') continue
     if (block.kind === 'text') {
-      const result = renderTavern(block.text, { role: 'assistant', streaming })
+      const result = renderTavern(block.text, { role: 'assistant', placement: 2, streaming, depth })
       rendered.push(<SafeHtml key={index} result={result} />)
     } else if (block.kind === 'reasoning') {
       if (block.text.trim() === '') continue
@@ -81,6 +113,8 @@ export const TavernAssistantNode = memo(function TavernAssistantNode({ node, gro
           renderTavern={renderTavern}
           hidden={reasoningHidden}
           t={t}
+          revision={revision}
+          depth={depth}
         />,
       )
     } else if (block.kind === 'image') {
@@ -124,11 +158,13 @@ function splitContent(content) {
   return { text: texts.join(''), attachments, rest }
 }
 
-export const TavernUserNode = memo(function TavernUserNode({ node, renderFactorySlot, loadImage, renderTavern, t }) {
+export const TavernUserNode = memo(function TavernUserNode({ node, renderFactorySlot, loadImage, renderTavern, renderConfig, useSession, useChat, depthIndex, t }) {
+  const revision = useRenderRevision(renderConfig)
+  const depth = useMessageDepth(node, useSession, useChat, depthIndex)
   const { text, attachments, rest } = splitContent(node.data.content)
   const result = useMemo(
-    () => renderTavern(text, { role: 'user' }),
-    [renderTavern, text],
+    () => renderTavern(text, { role: 'user', placement: 1, depth }),
+    [renderTavern, text, revision, depth],
   )
   return (
     <div className="dsh-tr-root dsh-tr-user-root" data-dsh-tavern-renderer>

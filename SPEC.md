@@ -8,6 +8,7 @@ The reverse-engineered source snapshots are fixed so later upstream changes cann
 
 - SillyTavern `SillyTavern/SillyTavern` commit `8172dcd0ee672d3cd9a5e5f7af134f91a45cd2b8` (working tree reports version 1.18.0).
 - DeepSeek Harness `deepseek-ai/DeepSeek-Harness` commit `47f943859bef60e4160492346772ded9b24f765a`.
+- The 0.4.0 regex display subset additionally uses SillyTavern 1.19.0 release commit `06bde939fb1e9c4c8d8641d810f0a916b5bce127`, with the rules below superseding the earlier regex description. Native Session/depth and reasoning contracts use DSH rc.5 source `b830ec950faba0a46dda564be3e2d854afed94f1`.
 
 Paths and line numbers below refer to those commits. The current Harness adapter was separately verified against shipped npm `0.2.1-rc.2` and `0.2.1-rc.3` hosts on 2026-10-23: `ui-chat` owns the session-scoped keyed node slot and `chat` locale. Images use the public `conversation.images.content` Factory with the owner-provided authorized `loadImage`. Web and Desktop share this client contract. V4 Session log replay, Profile plugin settings, preset plugin bundles, and Remote transport remain host concerns.
 
@@ -31,17 +32,23 @@ Regex replacement strings resolve macros immediately after capture interpolation
 
 ## 3. Regex scripts
 
-SillyTavern stores a JavaScript regex string in `findRegex` and a separate `replaceString` (`public/scripts/extensions/regex/index.js:780-786`, `826-864`). The engine:
+SillyTavern 1.19.0's `public/scripts/extensions/regex/engine.js` and `public/script.js` distinguish source/prompt passes from the Markdown display pass. This plugin implements the display subset, with a separate legacy dialect to preserve its pre-0.4 API.
 
-- orders script sets as global, preset, and scoped (`engine.js:11-27`, `99-132`);
-- filters by placement, display/prompt mode, edit mode, disabled state, and depth (`engine.js:323-389`);
-- parses JavaScript regex-string syntax such as `/pattern/gi`;
-- supports numbered and named JavaScript replacement references, plus `{{match}}` as the complete match;
-- trims configured strings from captured values before replacement;
-- resolves `substituteParams()` after capture interpolation (`engine.js:393-488`);
-- optionally substitutes macros in the find expression in none/raw/escaped modes.
+Compact `/pattern/replacement/flags` strings remain legacy. Old objects containing only `findRegex/replaceString/name/scriptName/roles/pattern/flags/replacement/enabled/disabled/trimStrings` also remain legacy. An explicit `format` wins; otherwise any of `placement/markdownOnly/promptOnly/substituteRegex/runOnEdit/minDepth/maxDepth` identifies an ST record. The importer explicitly tags every ST record with `format: 'sillytavern'`. Unknown JSON fields remain available; parsing and execution use derived objects.
 
-This plugin accepts both an ST-shaped object (`findRegex`, `replaceString`) and the requested compact `/pattern/replacement/flags` form. Ordered rules run sequentially. It implements `$1..$99`, `$<name>`, `$&`, `$$`, and `{{match}}`; replacement macros are then evaluated. Role placement, enabled state, and display-only operation are supported. Prompt mutation is intentionally out of scope.
+Legacy keeps its existing global bare-pattern default and JavaScript-style replacement references, including the preexisting unexpanded `{{match}}` behavior (use `$&` for a full legacy match). ST bare patterns have no implicit flags; slash literals use the final slash delimiter and valid current JavaScript flags. Duplicate, incompatible or invalid flags fail that rule. The plugin does not emulate upstream parser fallback bugs.
+
+ST records run only when `markdownOnly === true`; `promptOnly` never creates a source/prompt hook. Therefore both true runs the display branch, while both false or prompt-only remains inert with a diagnostic. `disabled` suppresses execution. Placements are `1` user/steering, `2` assistant text, `6` reasoning; unsupported values are reported and never mapped to another message kind. An empty placement list remains inert. `context.isEdit === true` requires `runOnEdit`; streaming and display rerenders do not set isEdit.
+
+`context.depth` is a known nonnegative message depth, newest `0`. Finite numeric bounds (including numeric strings) compare inclusively; empty/null/missing/negative bounds are unbounded. Invalid bounds are diagnosed. With unknown depth, a bounded rule is skipped with `DEPTH_UNAVAILABLE`; an unbounded rule can run. This intentionally differs from ST's missing-depth fallback. Native open Sessions compute depth from the current public Chat tail: one floor per user/steering/assistant-step node, with reasoning and text sharing one floor. Tools, context and controls are excluded. A per-Session index is rebuilt on order/store identity changes and reused on streaming updates.
+
+ST replacement recognizes `{{match}}` as `$0`, whole numeric capture indexes and `$<name>`. Missing/unmatched captures become empty, with no `$12` fallback to capture 1 plus `2`. Other JavaScript replacement tokens remain literal. Every capture insertion expands each trimStrings entry through the existing macro engine and deletes it literally; then the complete replacement expands macros. `substituteRegex` is `0` none, `1` raw macro expansion, `2` escaping only the macro-returned characters. The plugin supports its existing macro registry, not ST's complete runtime; unresolved macros are retained and diagnosed.
+
+One malformed rule produces an index/name/code diagnostic without rejecting its valid neighbors. `parseRegexRule()` itself can still throw. Pattern length and nested-quantifier limits remain in place; trusted rules can still consume excessive CPU.
+
+`parseRegexImport()` accepts one object, an array, or exactly `preset.extensions.regex_scripts` (the path used by ST's preset-manager). It preserves source order and flags and returns a source/summary receipt. Invalid array members stay inert. Missing preset regex is a no-change result. No prompts or other preset extensions are interpreted, and no source file is modified.
+
+The native `conversation.session.header.utilities` chooser imports each file as one saved set and selects it for the explicit current Session ID. Undefined selection keeps legacy global `regexRules`, null disables all regex for that Session, and a set ID runs only that set. Deleting a set changes its selected Sessions to null. Rules and selections persist in browser-local storage; a revision subscription updates existing user, assistant and reasoning views immediately. Browser `render()` and independent core consumers retain their explicit global/options behavior.
 
 ## 4. Macros and variables
 
@@ -116,7 +123,7 @@ Unknown directives and malformed completed directives remain literal. Directives
 ## 10. Compatibility boundaries
 
 - The plugin targets display only. It never rewrites model prompts or durable Harness events.
-- It does not reproduce SillyTavern regex script editors, preset storage, or depth UI.
+- It provides a small per-Session rule-set chooser; it does not reproduce SillyTavern's rule editor, preset manager, source/prompt passes or full runtime.
 - Safe expressions are a documented Harness extension, not a false claim about SillyTavern.
 - The narrower sanitizer can remove HTML/CSS that DOMPurify in a particular SillyTavern configuration would retain.
 - Harness has no native character-card identity in the chat-node contract. Defaults are `Assistant` and `User`; callers/configuration inject actual character and user names.
