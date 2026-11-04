@@ -168,8 +168,9 @@ function bound(value, field) {
 
 function canApply(rule, context, diagnostic) {
   if (rule.enabled === false || (rule.format === 'sillytavern' && rule.disabled === true)) return false
-  if (Array.isArray(rule.roles) && !rule.roles.includes(context.role)) return false
-  if (rule.format !== 'sillytavern') return true
+  if (rule.format !== 'sillytavern') {
+    return !Array.isArray(rule.roles) || rule.roles.includes(context.role)
+  }
   if (rule.markdownOnly !== true) {
     diagnostic('NOT_DISPLAY_RULE', 'ST rule is not enabled for display; convert it explicitly to use it here')
     return false

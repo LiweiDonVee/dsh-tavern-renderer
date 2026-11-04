@@ -57,6 +57,15 @@ describe('regex replacement engine', () => {
     expect(mixed.diagnostics[0].code).toBe('UNSUPPORTED_PLACEMENT')
   })
 
+  it('keeps roles inert in ST records while preserving legacy role filtering', () => {
+    const rule = st({ roles: ['user'] })
+    expect(applyRegexRules('hello', [rule], assistant).value).toBe('world')
+    expect(parseRegexRule(rule).roles).toEqual(['user'])
+    const legacy = { ...rule, format: 'legacy' }
+    expect(applyRegexRules('hello', [legacy], assistant).value).toBe('hello')
+    expect(applyRegexRules('hello', [legacy], { role: 'user' }).value).toBe('world')
+  })
+
   it('honors disabled state, explicit edit mode and inclusive depth without treating streaming as editing', () => {
     const rule = st({ minDepth: 1, maxDepth: 2, runOnEdit: false })
     expect(applyRegexRules('hello', [rule], { ...assistant, depth: 1, streaming: true }).value).toBe('world')
