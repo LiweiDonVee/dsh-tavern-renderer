@@ -6,7 +6,7 @@
 
 ## 安装和启用
 
-当前版本 `0.4.0` 适配 DeepSeek Harness `0.2.1-rc.2` / `0.2.1-rc.3` / `0.2.1-rc.5`，支持 Web 和桌面端，要求 Node.js 24+。发布包包含构建后的 `lib/client.js`，宿主安装插件时无需运行构建脚本。旧 DSH `0.1.x` 请继续使用旧插件版本。
+当前版本 `0.4.0` 适配 DeepSeek Harness `0.2.1-rc.2` / `0.2.1-rc.3` / `0.2.1-rc.5` / `0.2.2-rc.1`，要求 Node.js 24+。Web 和桌面端共用客户端扩展契约；`0.2.2-rc.1` 已用实际随包 Web 客户端验证，本次未执行 Electron 窗口验收。发布包包含构建后的 `lib/client.js`，宿主安装插件时无需运行构建脚本。旧 DSH `0.1.x` 请继续使用旧插件版本。
 
 ### Web
 
@@ -252,7 +252,7 @@ npm run check
 npm pack --dry-run
 ```
 
-`test:host` 默认读取 `.host/node_modules`，也可用 `DSH_HOST_NODE_MODULES` 指向另一套宿主包。CI 在 Windows/Linux 上分别检查 `0.2.1-rc.2` 和 `0.2.1-rc.3`。私有 RP dock 测试仅在提供 `DSH_RP_UI_DIR` 时运行。
+`test:host` 默认读取 `.host/node_modules`，也可用 `DSH_HOST_NODE_MODULES` 指向另一套宿主包。CI 矩阵包含 Windows/Linux 上的 `0.2.1-rc.2`、`0.2.1-rc.3`、`0.2.1-rc.5` 和 `0.2.2-rc.1`。私有 RP dock 测试仅在提供 `DSH_RP_UI_DIR` 时运行。
 
 测试文件为九项原始验收能力和八种文档模板各提供至少一条“输入 -> 期望输出”样例，并额外覆盖 slot 优先级、编码后的危险协议、SVG/iframe/form、CSS 远程加载、恶意角色模板、文档字段注入与流式草稿。
 
@@ -271,10 +271,11 @@ npm pack --dry-run
 
 页面根节点的 `data-dsh-tavern-renderer-version="0.4.0"` 可用于部署探针；每条渲染内容还带 `data-render-trace` 诊断属性。
 
-## DSH 兼容边界（2026-10-23）
+## DSH 兼容边界（2026-11-09）
 
 - Host 空 `apply()`、`dsh.bundle.patch`、`dsh.client.inject` 和 `window.__ModuleLoader__.load` 继续使用；客户端依赖显式包含 `ui-chat` 和提供图库 Factory 的 `ui-attachment`。已按实际 `0.2.1-rc.2` / `rc.3` npm 包验证完整注入闭包和 `engines.dsh` 兼容检查，无需版本豁免。
 - 此插件没有 `ApiProxy`、后端 Remote 服务或自定义 settings card；会话显示正则入口使用公开的 `conversation.session.header.utilities`，主题/宏配置继续由浏览器 API 和 localStorage 管理。
 - 只消费 `assistant-step` / `user` / `steering` 的展示节点，不读写 V4 Session 日志，也不参与 RP settlement。保留流式 `running` 与最终 `settled` / `interrupted` 语义，并遵循 `groupPart` 和回合思考折叠状态；文件、图片附件保持原始顺序，会话引用标签保持可见。
 - `snapshotEvents`、`eventAt` 和 `ownEvents` 已从渲染器边界排除；agent 生命周期、Profile plugin settings、Remote 双向流和 preset plugin bundles 由宿主负责。渲染器按 Session ID 取得会话作用域，因此多个 Session 可同时拥有独立变量与 renderer 实例。
 - `npm run check` 覆盖核心渲染、真实 slot 装配、Session 隔离、授权图片入口，以及 Web / 模拟桌面 `dsh-app://app/` 环境中的停用、重新启用和配置恢复。桌面协议使用 JSDOM 模拟；不等同于在签名 Electron 安装包中完成登录和端到端验收。
+- `0.2.2-rc.1` 已按 Windows Desktop 随包运行时 `c59d10aff167ad7eefead4b3a9082fb57c8fbfe8`（dirty=false）重新验证原正式 `0.4.0` 包，无需版本豁免或替换产品代码。隔离 Web profile 的 14 项原生显示回归和 3 项图片/分页检查通过：完整 ST 预设导入、流式显示、会话独立选择与“无”、原文复制和模型历史、冷重开、实际插件管理停启、用户/助手图片，以及从尾页加载更早消息。离线模型夹具只提供测试输出，客户端模块、Session、图片加载和分页均使用该运行时实现。

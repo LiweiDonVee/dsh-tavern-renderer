@@ -33,7 +33,7 @@ test('current DSH accepts the renderer without a version exemption', { skip: hos
 
 async function host({ desktop = false } = {}) {
   const frontend = hostPath('dsh-web-frontend', 'dist')
-  assert.match(json(hostPath('dsh-web-frontend', 'package.json')).version, /^0\.2\.1-rc\.(?:2|3|5)$/)
+  assert.match(json(hostPath('dsh-web-frontend', 'package.json')).version, /^(?:0\.2\.1-rc\.(?:2|3|5)|0\.2\.2-rc\.1)$/)
   const html = readFileSync(join(frontend, 'index.html'), 'utf8')
   const entry = resolve(frontend, html.match(/<script type="module"[^>]*src="([^"]+)"/)[1])
   const source = readFileSync(entry, 'utf8')
@@ -235,7 +235,19 @@ for (const desktop of [false, true]) {
     ctx.slots.register({ name: 'conversation.chat.node', key: 'assistant-step', children: {
       'conversation.chat.message.images': { kind: 'single', scope: 'session' },
     } }, () => React.createElement('span', null, 'native renderer'))
-    await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-attachment'))
+    const attachmentPlugin = await h.loader.import('@deepseek-ai/dsh-client-ui-attachment')
+    if (attachmentPlugin.inject.includes('fileDrag')) {
+      // 0.2.2-rc.1's image Factory receives drag and context-menu props from
+      // these providers. Locale and shortcut catalogs remain fixture services.
+      ctx.reflect.provide('locale', {
+        register: () => () => {},
+        bind: () => (key, values) => values?.labels ?? key,
+      })
+      ctx.reflect.provide('shortcuts', { catalog: observable([]) })
+      await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-file-drag'))
+      await ctx.plugin(await h.loader.import('@deepseek-ai/dsh-client-ui-context-menu'))
+    }
+    await ctx.plugin(attachmentPlugin)
     const entryErrors = []
     ctx.slots.onEntryError((_entry, error) => entryErrors.push(error))
     let plugin = await ctx.plugin(await h.loader.import('dsh-tavern-renderer'))
